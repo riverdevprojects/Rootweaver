@@ -6,8 +6,8 @@ import net.minecraft.util.Mth;
 
 public final class PineGrowthStrategy implements GrowthStrategy {
     @Override
-    public TrunkPlan planTrunk(TreeDefinition d, GenerationContext c) {
+    public GrowthProfile profile(TreeDefinition d, GenerationContext c) {
         int h = Mth.nextInt(c.random(), d.minHeight(), d.maxHeight());
-        return new TrunkPlan(h, 0, 0, 0.35f, 0.8f);
+        return new GrowthProfile(h, 1.0f, 0.4f, 0.84f, 0.07f, 0.45f, 0.38f);
     }
 }

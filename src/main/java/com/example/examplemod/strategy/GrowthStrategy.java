@@ -4,7 +4,8 @@ import com.example.examplemod.api.definition.TreeDefinition;
 import com.example.examplemod.generation.context.GenerationContext;
 
 public interface GrowthStrategy {
-    TrunkPlan planTrunk(TreeDefinition definition, GenerationContext context);
+    GrowthProfile profile(TreeDefinition definition, GenerationContext context);
 
-    record TrunkPlan(int height, int leanX, int leanZ, float branchBias, float taper) {}
+    record GrowthProfile(int trunkSteps, float stepSize, float branchBias, float taper, float curvature, float upwardPull,
+                         float branchDivergence) {}
 }
