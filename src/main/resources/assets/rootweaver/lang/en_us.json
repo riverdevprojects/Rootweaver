@@ -1,0 +1,13 @@
+{
+  "itemGroup.rootweaver": "Rootweaver Tab",
+  "block.rootweaver.example_block": "Example Block",
+  "item.rootweaver.example_item": "Example Item",
+
+  "rootweaver.configuration.title": "Rootweaver Configs",
+  "rootweaver.configuration.section.rootweaver.common.toml": "Rootweaver Configs",
+  "rootweaver.configuration.section.rootweaver.common.toml.title": "Rootweaver Configs",
+  "rootweaver.configuration.items": "Item List",
+  "rootweaver.configuration.logDirtBlock": "Log Dirt Block",
+  "rootweaver.configuration.magicNumberIntroduction": "Magic Number Text",
+  "rootweaver.configuration.magicNumber": "Magic Number"
+}
