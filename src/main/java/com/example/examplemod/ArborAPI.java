@@ -12,7 +12,7 @@ import org.slf4j.Logger;
 
 @Mod(ArborAPI.MOD_ID)
 public final class ArborAPI {
-    public static final String MOD_ID = "arborapi";
+    public static final String MOD_ID = "examplemod";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ArborAPI(IEventBus modEventBus) {
