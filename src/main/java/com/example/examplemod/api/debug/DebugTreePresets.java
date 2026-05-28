@@ -10,10 +10,33 @@ public final class DebugTreePresets {
     private DebugTreePresets() {}
 
     public static void bootstrap() {
-        TreeRegistry.register(ArborPresets.oak("debug_oak"));
+        TreeRegistry.register(buildOak());
         TreeRegistry.register(ArborPresets.pine("debug_pine"));
         TreeRegistry.register(ArborPresets.giant("debug_giant"));
         TreeRegistry.register(buildOldOak());
+    }
+
+    /**
+     * Mature woodland oak — same biological family as old-growth but younger and more common.
+     * Spawn with: /arbor spawn debug_oak
+     */
+    private static TreeDefinition buildOak() {
+        return TreeDefinition.builder("debug_oak")
+                .height(10, 16)
+                .trunkWidth(2, 3)
+                .branchDensity(0.80f)
+                .branchLength(6, 11)
+                .leafDensity(0.80f)
+                .rootChance(0.35f)
+                .canLean(true)
+                .canSplitTrunk(true)
+                .maxRecursionDepth(3)
+                .growthStyle(GrowthStyle.ANCIENT_OAK)
+                .leafShape(LeafShape.LAYERED)
+                .heightVariation(0.20f)
+                .branchVariation(0.25f)
+                .canopyVariation(0.30f)
+                .build();
     }
 
     /**
