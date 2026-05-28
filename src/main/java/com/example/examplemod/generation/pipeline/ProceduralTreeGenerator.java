@@ -1,5 +1,6 @@
 package com.example.examplemod.generation.pipeline;
 
+import com.example.examplemod.api.definition.GrowthStyle;
 import com.example.examplemod.api.definition.TreeDefinition;
 import com.example.examplemod.generation.context.GenerationContext;
 import com.example.examplemod.generation.terrain.TerrainAdapter;
@@ -20,6 +21,9 @@ public final class ProceduralTreeGenerator {
     private static final boolean DEBUG_STRUCTURE = Boolean.getBoolean("arborforge.debugStructure");
 
     public boolean generate(TreeDefinition definition, GenerationContext ctx) {
+        if (definition.growthStyle() == GrowthStyle.ANCIENT_OAK) {
+            return new AncientOakGenerator().generate(definition, ctx);
+        }
         LevelAccessor level = ctx.level();
         BlockPos base = TerrainAdapter.findSurface(level, ctx.origin());
         GrowthStrategy strategy = StrategyRegistry.resolve(definition.growthStyle());

@@ -6,5 +6,6 @@ public enum GrowthStyle {
     WILLOW,
     DEAD_TREE,
     GIANT_FOREST,
-    CUSTOM
+    CUSTOM,
+    ANCIENT_OAK
 }

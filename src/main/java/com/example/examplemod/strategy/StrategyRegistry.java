@@ -13,6 +13,7 @@ public final class StrategyRegistry {
         STRATEGIES.put(GrowthStyle.DEAD_TREE, new PineGrowthStrategy());
         STRATEGIES.put(GrowthStyle.GIANT_FOREST, new OakGrowthStrategy());
         STRATEGIES.put(GrowthStyle.CUSTOM, new OakGrowthStrategy());
+        STRATEGIES.put(GrowthStyle.ANCIENT_OAK, new OakGrowthStrategy());
     }
     public static GrowthStrategy resolve(GrowthStyle style) { return STRATEGIES.get(style); }
 }
