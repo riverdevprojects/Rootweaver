@@ -25,8 +25,8 @@ import java.util.List;
  */
 public final class AncientOakGenerator {
 
-    private static final BlockState WOOD   = Blocks.DARK_OAK_LOG.defaultBlockState();
-    private static final BlockState LEAVES = Blocks.DARK_OAK_LEAVES.defaultBlockState();
+    private BlockState wood;
+    private BlockState leaves;
 
     private record Node(Vec3 pos, Vec3 dir, float radius) {}
 
@@ -35,6 +35,15 @@ public final class AncientOakGenerator {
     // -----------------------------------------------------------------------
 
     public boolean generate(TreeDefinition def, GenerationContext ctx) {
+        // Old-growth trees use dark oak; mature woodland oaks use regular oak
+        if (def.maxBranchLength() >= 15) {
+            wood   = Blocks.DARK_OAK_LOG.defaultBlockState();
+            leaves = Blocks.DARK_OAK_LEAVES.defaultBlockState();
+        } else {
+            wood   = Blocks.OAK_LOG.defaultBlockState();
+            leaves = Blocks.OAK_LEAVES.defaultBlockState();
+        }
+
         LevelAccessor level = ctx.level();
         BlockPos base = TerrainAdapter.findSurface(level, ctx.origin());
         RandomSource rand = ctx.random();
@@ -54,9 +63,9 @@ public final class AncientOakGenerator {
         for (List<Node> branch : allBranches) {
             for (Node n : branch) {
                 if (n.radius() >= 0.3f) {
-                    paintSphere(level, n.pos(), n.radius(), WOOD);
+                    paintSphere(level, n.pos(), n.radius(), wood);
                 } else {
-                    setIfAirOrWood(level, BlockPos.containing(n.pos()), WOOD);
+                    setIfAirOrWood(level, BlockPos.containing(n.pos()), wood);
                 }
             }
         }
@@ -125,7 +134,8 @@ public final class AncientOakGenerator {
 
     private List<List<Node>> growRoots(BlockPos base, TreeDefinition def, RandomSource rand) {
         List<List<Node>> roots = new ArrayList<>();
-        int count = 4 + rand.nextInt(3);
+        // Scale root count with rootChance: ~2-3 for young oak (0.35), ~6-7 for old-growth (1.0)
+        int count = Math.max(2, (int)(def.rootChance() * 6.0f) + rand.nextInt(2));
         for (int i = 0; i < count; i++) {
             double angle = (2 * Math.PI * i / count) + (rand.nextDouble() - 0.5) * 0.9;
             roots.add(growSingleRoot(base, angle, def, rand));
@@ -135,7 +145,8 @@ public final class AncientOakGenerator {
 
     private List<Node> growSingleRoot(BlockPos base, double angle, TreeDefinition def, RandomSource rand) {
         List<Node> nodes = new ArrayList<>();
-        int steps = 9 + rand.nextInt(7);
+        // Scale root length with minBranchLength: shorter roots on young trees
+        int steps = def.minBranchLength() - 2 + rand.nextInt(5);
         float startRadius = def.maxTrunkWidth() * 0.28f + rand.nextFloat() * 0.3f;
         startRadius = Math.max(0.5f, startRadius);
 
@@ -168,7 +179,8 @@ public final class AncientOakGenerator {
     private void growAllBranches(List<Node> trunk, TreeDefinition def, RandomSource rand,
                                   List<List<Node>> allBranches, List<Vec3> leafAnchors) {
         int trunkSize    = trunk.size();
-        int primaryCount = 4 + rand.nextInt(4);
+        // Slightly fewer primaries on young trees, more on old-growth
+        int primaryCount = 3 + rand.nextInt(Math.max(2, (int)(def.branchDensity() * 5)));
 
         for (int b = 0; b < primaryCount; b++) {
             double angle = (2 * Math.PI * b / primaryCount) + (rand.nextDouble() - 0.5) * (Math.PI / primaryCount);
@@ -177,7 +189,8 @@ public final class AncientOakGenerator {
             int spawnIdx  = Math.min(trunkSize - 2, (int) (tSpawn * trunkSize));
             Node spawn    = trunk.get(spawnIdx);
 
-            int primarySteps  = 18 + rand.nextInt(10);
+            // Key scale driver: longer branches on old-growth, shorter on young trees
+            int primarySteps  = def.maxBranchLength() + rand.nextInt(Math.max(2, def.maxBranchLength() / 4));
             double stepSize   = 0.90 + rand.nextDouble() * 0.25;
 
             // Branches sweep outward AND upward — 17-40° elevation gives classic oak arc shape
@@ -186,8 +199,8 @@ public final class AncientOakGenerator {
             Vec3 initDir = outDir.scale(Math.cos(elevation))
                     .add(0, Math.sin(elevation), 0).normalize();
 
-            // Primary branches must be thick — minimum 1.5 radius regardless of trunk width
-            float primaryRadius = Math.max(1.5f, spawn.radius() * (0.48f + rand.nextFloat() * 0.18f));
+            // Minimum primary radius scales with trunk width — thinner on young trees
+            float primaryRadius = Math.max(def.minTrunkWidth() * 0.5f, spawn.radius() * (0.48f + rand.nextFloat() * 0.18f));
 
             List<Node> primary = growPrimary(spawn.pos(), initDir, primarySteps, (float) stepSize,
                     primaryRadius, def, rand, allBranches, leafAnchors);
@@ -208,8 +221,8 @@ public final class AncientOakGenerator {
         Vec3 dir = startDir;
         double accX = 0, accZ = 0;
 
-        // 2-4 secondaries per primary for a denser tree
-        int secCount = 2 + rand.nextInt(3);
+        // More secondaries on denser old-growth, fewer on young trees
+        int secCount = Math.max(1, (int)(def.branchDensity() * 3.5f)) + rand.nextInt(2);
         int[] secPositions = pickAttachPoints(steps, secCount, 0.20f, 0.85f, rand);
 
         for (int i = 0; i < steps; i++) {
@@ -244,7 +257,8 @@ public final class AncientOakGenerator {
 
     private void growSecondary(Vec3 startPos, Vec3 parentDir, float startRadius, TreeDefinition def,
                                 RandomSource rand, List<List<Node>> allBranches, List<Vec3> leafAnchors) {
-        int steps = 8 + rand.nextInt(6);
+        // Secondary length scales with maxBranchLength: ~5-8 for young oak, ~10-13 for old-growth
+        int steps = Math.max(4, def.maxBranchLength() / 2) + rand.nextInt(4);
         Vec3 dir  = divergeDir(parentDir, 0.35, 0.55, 0.45, rand);
         List<Node> nodes = new ArrayList<>();
         Vec3 pos = startPos;
@@ -304,7 +318,8 @@ public final class AncientOakGenerator {
             allBranches.add(nodes);
             leafAnchors.add(nodes.get(nodes.size() - 1).pos());
 
-            int twigCount = rand.nextInt(3);
+            // Fewer twigs on shallower trees (depth 3), full complement on old-growth (depth 4+)
+            int twigCount = def.maxRecursionDepth() >= 4 ? rand.nextInt(3) : rand.nextInt(2);
             for (int tw = 0; tw < twigCount; tw++) {
                 int idx = (int) (nodes.size() * (0.4 + rand.nextDouble() * 0.45));
                 idx = Math.min(idx, nodes.size() - 1);
@@ -350,12 +365,12 @@ public final class AncientOakGenerator {
 
     private void paintTrunk(LevelAccessor level, List<Node> trunk, RandomSource rand) {
         for (Node n : trunk) {
-            paintSphere(level, n.pos(), n.radius(), WOOD);
+            paintSphere(level, n.pos(), n.radius(), wood);
             // Small bark-mass splat at base — kept subtle so it doesn't create blobs
             if (n.radius() > 2.5f && rand.nextFloat() < 0.35f) {
                 double ox = (rand.nextDouble() - 0.5) * 1.2;
                 double oz = (rand.nextDouble() - 0.5) * 1.2;
-                paintSphere(level, n.pos().add(ox, 0, oz), n.radius() * 0.38f, WOOD);
+                paintSphere(level, n.pos().add(ox, 0, oz), n.radius() * 0.38f, wood);
             }
         }
     }
@@ -370,7 +385,7 @@ public final class AncientOakGenerator {
                     if (existing.isAir() || existing.is(Blocks.GRASS_BLOCK)
                             || existing.is(Blocks.DIRT) || existing.is(Blocks.PODZOL)
                             || existing.is(Blocks.COARSE_DIRT)) {
-                        level.setBlock(p, WOOD, 3);
+                        level.setBlock(p, wood, 3);
                     }
                 }
             }
@@ -384,32 +399,36 @@ public final class AncientOakGenerator {
      */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors, TreeDefinition def, RandomSource rand) {
         float density = Mth.clamp(def.leafDensity(), 0.45f, 0.92f);
+        // branchScale: 0.55 for young oak (maxBranch=11), 1.0 for old-growth (maxBranch=20)
+        float branchScale = def.maxBranchLength() / 20.0f;
 
         for (Vec3 anchor : anchors) {
-            // Primary cluster — meaningfully sized
-            int rx = 3 + rand.nextInt(3); // 3-5
-            int ry = 2 + rand.nextInt(3); // 2-4
-            int rz = 3 + rand.nextInt(3); // 3-5
+            // Primary cluster — scaled with tree age
+            int rx = 2 + rand.nextInt(1 + (int)(branchScale * 3)); // 2-3 young, 2-5 old
+            int ry = Math.max(1, rx - 1) + rand.nextInt(2);
+            int rz = 2 + rand.nextInt(1 + (int)(branchScale * 3));
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
 
-            // Secondary lobe — offset outward, slightly sparser (high probability)
+            // Secondary lobe — spread scales with branch length so young oaks stay compact
             if (rand.nextFloat() < 0.72f) {
+                double lobeRange = 1.5 + def.maxBranchLength() * 0.075;
                 Vec3 offset = new Vec3(
-                        (rand.nextDouble() - 0.5) * 3.0,
-                        (rand.nextDouble() - 0.5) * 1.8,
-                        (rand.nextDouble() - 0.5) * 3.0);
-                int r2 = 3 + rand.nextInt(3);
+                        (rand.nextDouble() - 0.5) * lobeRange,
+                        (rand.nextDouble() - 0.5) * lobeRange * 0.6,
+                        (rand.nextDouble() - 0.5) * lobeRange);
+                int r2 = 2 + rand.nextInt(1 + (int)(branchScale * 3));
                 int r2y = Math.max(1, r2 - 1);
                 paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.70f);
             }
 
             // Tertiary lobe — adds canopy volume in a different direction
             if (rand.nextFloat() < 0.40f) {
+                double terRange = 2.0 + def.maxBranchLength() * 0.1;
                 Vec3 offset2 = new Vec3(
-                        (rand.nextDouble() - 0.5) * 4.0,
-                        (rand.nextDouble() - 0.5) * 2.5,
-                        (rand.nextDouble() - 0.5) * 4.0);
-                int r3 = 2 + rand.nextInt(3);
+                        (rand.nextDouble() - 0.5) * terRange,
+                        (rand.nextDouble() - 0.5) * terRange * 0.625,
+                        (rand.nextDouble() - 0.5) * terRange);
+                int r3 = 2 + rand.nextInt(1 + (int)(branchScale * 2));
                 paintEllipsoid(level, anchor.add(offset2), r3, r3, r3, rand, density * 0.55f);
             }
 
@@ -462,7 +481,7 @@ public final class AncientOakGenerator {
             if (nx * nx + ny * ny + nz * nz <= 1.0 && rand.nextFloat() <= density) {
                 BlockPos p = BlockPos.containing(center.x + dx, center.y + dy, center.z + dz);
                 if (level.getBlockState(p).isAir()) {
-                    level.setBlock(p, LEAVES, 3);
+                    level.setBlock(p, leaves, 3);
                 }
             }
         }
@@ -470,7 +489,7 @@ public final class AncientOakGenerator {
 
     private void setIfAirOrWood(LevelAccessor level, BlockPos pos, BlockState state) {
         BlockState existing = level.getBlockState(pos);
-        if (existing.isAir() || existing.is(Blocks.DARK_OAK_LEAVES)) {
+        if (existing.isAir() || existing.getBlock() == leaves.getBlock()) {
             level.setBlock(pos, state, 3);
         }
     }
