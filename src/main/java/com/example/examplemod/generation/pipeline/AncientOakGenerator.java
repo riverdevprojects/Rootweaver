@@ -39,8 +39,7 @@ public final class AncientOakGenerator {
         BlockPos base = TerrainAdapter.findSurface(level, ctx.origin());
         RandomSource rand = ctx.random();
 
-        // Tree personality — drives lean direction and twist feel
-        double leanAngle   = rand.nextDouble() * 2 * Math.PI;
+        double leanAngle    = rand.nextDouble() * 2 * Math.PI;
         double leanStrength = 0.025 + rand.nextDouble() * 0.055;
 
         List<Node> trunk = growTrunk(base, def, rand, leanAngle, leanStrength);
@@ -50,11 +49,8 @@ public final class AncientOakGenerator {
 
         growAllBranches(trunk, def, rand, allBranches, leafAnchors);
 
-        // Paint wood
         paintTrunk(level, trunk, rand);
-        for (List<Node> root : roots) {
-            paintRoot(level, root);
-        }
+        for (List<Node> root : roots) paintRoot(level, root);
         for (List<Node> branch : allBranches) {
             for (Node n : branch) {
                 if (n.radius() >= 0.3f) {
@@ -65,9 +61,7 @@ public final class AncientOakGenerator {
             }
         }
 
-        // Paint foliage
         placeLeafClusters(level, leafAnchors, def, rand);
-
         return true;
     }
 
@@ -89,32 +83,31 @@ public final class AncientOakGenerator {
                 Math.sin(leanAngle) * leanStrength).normalize();
 
         double accX = 0, accZ = 0;
-        // Slow twist: lean direction rotates as tree grows
         double twistRate = (rand.nextDouble() - 0.5) * 0.04;
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
 
-            // Aggressive base flare — cubic decay from base
-            float flare = t < 0.14f
-                    ? (float) Math.pow(1.0 - t / 0.14, 2.2) * (def.maxTrunkWidth() * 0.6f)
+            // Natural taper: stays wide throughout — top stays at 1.4 radius (nearly 3 blocks wide)
+            float natural = Mth.lerp(t, def.maxTrunkWidth() * 0.58f, 1.4f);
+
+            // Gradual base flare extending over first 28% of height — power 1.6 for smooth roll-off
+            float flare = t < 0.28f
+                    ? (float) Math.pow(1.0 - t / 0.28, 1.6) * (def.maxTrunkWidth() * 0.48f)
                     : 0.0f;
-            // Natural taper from max to a narrow top
-            float natural = Mth.lerp(t, def.maxTrunkWidth() * 0.52f, 0.55f);
+
             float radius = natural + flare;
 
-            // Occasional bark bulge for age character
-            if (rand.nextFloat() < 0.06f && t > 0.1f && t < 0.9f) {
-                radius += 0.25f + rand.nextFloat() * 0.35f;
+            // Occasional bark bulge — keeps effect subtle
+            if (rand.nextFloat() < 0.05f && t > 0.08f && t < 0.92f) {
+                radius += 0.2f + rand.nextFloat() * 0.25f;
             }
 
             nodes.add(new Node(pos, dir, radius));
 
-            // Smooth accumulated curvature (Perlin-like)
             accX = accX * 0.82 + (rand.nextDouble() - 0.5) * 0.07;
             accZ = accZ * 0.82 + (rand.nextDouble() - 0.5) * 0.07;
 
-            // Slowly rotating lean axis
             leanAngle += twistRate;
             double lx = Math.cos(leanAngle) * leanStrength * 0.25;
             double lz = Math.sin(leanAngle) * leanStrength * 0.25;
@@ -133,7 +126,6 @@ public final class AncientOakGenerator {
     private List<List<Node>> growRoots(BlockPos base, TreeDefinition def, RandomSource rand) {
         List<List<Node>> roots = new ArrayList<>();
         int count = 4 + rand.nextInt(3);
-
         for (int i = 0; i < count; i++) {
             double angle = (2 * Math.PI * i / count) + (rand.nextDouble() - 0.5) * 0.9;
             roots.add(growSingleRoot(base, angle, def, rand));
@@ -147,7 +139,6 @@ public final class AncientOakGenerator {
         float startRadius = def.maxTrunkWidth() * 0.28f + rand.nextFloat() * 0.3f;
         startRadius = Math.max(0.5f, startRadius);
 
-        // Roots sweep outward and slightly downward
         double outward  = 0.75 + rand.nextDouble() * 0.35;
         double downward = -(0.08 + rand.nextDouble() * 0.18);
 
@@ -159,7 +150,6 @@ public final class AncientOakGenerator {
             float radius = Math.max(0.2f, startRadius * (1.0f - t * 0.78f));
             nodes.add(new Node(pos, dir, radius));
 
-            // Roots dive more into the ground as they extend
             double divePull = -(0.03 + t * 0.07);
             Vec3 jitter = new Vec3(
                     (rand.nextDouble() - 0.5) * 0.1,
@@ -177,29 +167,27 @@ public final class AncientOakGenerator {
 
     private void growAllBranches(List<Node> trunk, TreeDefinition def, RandomSource rand,
                                   List<List<Node>> allBranches, List<Vec3> leafAnchors) {
-        int trunkSize   = trunk.size();
-        int primaryCount = 4 + rand.nextInt(4); // 4–7 primary branches
+        int trunkSize    = trunk.size();
+        int primaryCount = 4 + rand.nextInt(4);
 
-        // Evenly distribute primary branch angles around trunk, with per-branch jitter
         for (int b = 0; b < primaryCount; b++) {
             double angle = (2 * Math.PI * b / primaryCount) + (rand.nextDouble() - 0.5) * (Math.PI / primaryCount);
 
-            // Spawn height: 28–72 % up the trunk, weighted toward lower-middle
-            float tSpawn = 0.28f + rand.nextFloat() * 0.44f;
-            int spawnIdx = Math.min(trunkSize - 2, (int) (tSpawn * trunkSize));
-            Node spawn   = trunk.get(spawnIdx);
+            float tSpawn  = 0.28f + rand.nextFloat() * 0.44f;
+            int spawnIdx  = Math.min(trunkSize - 2, (int) (tSpawn * trunkSize));
+            Node spawn    = trunk.get(spawnIdx);
 
-            // Primary branch — long, sweeping, with heavy arc
-            int primarySteps = 18 + rand.nextInt(10); // 18–27 steps
-            double stepSize  = 0.85 + rand.nextDouble() * 0.3;
+            int primarySteps  = 18 + rand.nextInt(10);
+            double stepSize   = 0.90 + rand.nextDouble() * 0.25;
 
-            // Initial direction: mostly horizontal with slight upward tilt
-            double elevation = 0.08 + rand.nextDouble() * 0.22;
+            // Branches sweep outward AND upward — 17-40° elevation gives classic oak arc shape
+            double elevation = 0.30 + rand.nextDouble() * 0.38;
             Vec3 outDir  = new Vec3(Math.cos(angle), 0, Math.sin(angle));
             Vec3 initDir = outDir.scale(Math.cos(elevation))
                     .add(0, Math.sin(elevation), 0).normalize();
 
-            float primaryRadius = Math.max(1.1f, spawn.radius() * (0.42f + rand.nextFloat() * 0.22f));
+            // Primary branches must be thick — minimum 1.5 radius regardless of trunk width
+            float primaryRadius = Math.max(1.5f, spawn.radius() * (0.48f + rand.nextFloat() * 0.18f));
 
             List<Node> primary = growPrimary(spawn.pos(), initDir, primarySteps, (float) stepSize,
                     primaryRadius, def, rand, allBranches, leafAnchors);
@@ -212,10 +200,6 @@ public final class AncientOakGenerator {
     // Primary branch  (depth 1)
     // -----------------------------------------------------------------------
 
-    /**
-     * Primary branches sweep outward, sag in the middle, and tip upward —
-     * simulating the weight of a centuries-old oak limb.
-     */
     private List<Node> growPrimary(Vec3 startPos, Vec3 startDir, int steps, float stepSize,
                                     float startRadius, TreeDefinition def, RandomSource rand,
                                     List<List<Node>> allBranches, List<Vec3> leafAnchors) {
@@ -224,28 +208,27 @@ public final class AncientOakGenerator {
         Vec3 dir = startDir;
         double accX = 0, accZ = 0;
 
-        // Decide secondary attachment positions up-front (fixed count for control)
-        int secCount = 1 + rand.nextInt(3); // 1–3 secondaries
-        int[] secPositions = pickAttachPoints(steps, secCount, 0.25f, 0.85f, rand);
+        // 2-4 secondaries per primary for a denser tree
+        int secCount = 2 + rand.nextInt(3);
+        int[] secPositions = pickAttachPoints(steps, secCount, 0.20f, 0.85f, rand);
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
-            float radius = Math.max(0.4f, startRadius * (1.0f - t * 0.72f));
+            // Slow taper — branch stays chunky along most of its length
+            float radius = Math.max(0.65f, startRadius * (1.0f - t * 0.55f));
             nodes.add(new Node(pos, dir, radius));
 
-            // Spawn secondary branches at pre-chosen positions
             for (int sp : secPositions) {
                 if (sp == i) {
-                    float secRadius = Math.max(0.5f, radius * (0.45f + rand.nextFloat() * 0.2f));
+                    // Secondary minimum is 0.8 — always visible as a 2-block-wide limb
+                    float secRadius = Math.max(0.80f, radius * (0.58f + rand.nextFloat() * 0.18f));
                     growSecondary(pos, dir, secRadius, def, rand, allBranches, leafAnchors);
                 }
             }
 
-            // Smooth curvature noise
             accX = accX * 0.78 + (rand.nextDouble() - 0.5) * 0.10;
             accZ = accZ * 0.78 + (rand.nextDouble() - 0.5) * 0.10;
 
-            // Sag arc: peaks at t=0.5, tips curve back upward
             double sag       = Math.sin(Math.PI * t) * -0.10;
             double lightSeek = 0.035 + t * 0.045;
             dir = dir.add(accX, sag + lightSeek, accZ).normalize();
@@ -261,23 +244,26 @@ public final class AncientOakGenerator {
 
     private void growSecondary(Vec3 startPos, Vec3 parentDir, float startRadius, TreeDefinition def,
                                 RandomSource rand, List<List<Node>> allBranches, List<Vec3> leafAnchors) {
-        int steps = 8 + rand.nextInt(6); // 8–13 steps
+        int steps = 8 + rand.nextInt(6);
         Vec3 dir  = divergeDir(parentDir, 0.35, 0.55, 0.45, rand);
         List<Node> nodes = new ArrayList<>();
         Vec3 pos = startPos;
         double accX = 0, accZ = 0;
 
-        int tertiaryCount = 1 + rand.nextInt(3);
-        int[] tertiaryPositions = pickAttachPoints(steps, tertiaryCount, 0.3f, 0.85f, rand);
+        // 2-4 tertiaries per secondary
+        int tertiaryCount    = 2 + rand.nextInt(3);
+        int[] tertiaryPositions = pickAttachPoints(steps, tertiaryCount, 0.25f, 0.85f, rand);
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
-            float radius = Math.max(0.3f, startRadius * (1.0f - t * 0.75f));
+            // Minimum 0.45 — secondary always visible as at least 1 block wide
+            float radius = Math.max(0.45f, startRadius * (1.0f - t * 0.58f));
             nodes.add(new Node(pos, dir, radius));
 
             for (int sp : tertiaryPositions) {
                 if (sp == i) {
-                    float terRadius = Math.max(0.22f, radius * (0.42f + rand.nextFloat() * 0.18f));
+                    // Tertiary minimum 0.38 — just about visible as single blocks
+                    float terRadius = Math.max(0.38f, radius * (0.55f + rand.nextFloat() * 0.18f));
                     growTertiary(pos, dir, terRadius, def, rand, allBranches, leafAnchors);
                 }
             }
@@ -292,20 +278,20 @@ public final class AncientOakGenerator {
     }
 
     // -----------------------------------------------------------------------
-    // Tertiary branch  (depth 3) — leaf anchors generated here
+    // Tertiary branch  (depth 3) — primary source of leaf anchors
     // -----------------------------------------------------------------------
 
     private void growTertiary(Vec3 startPos, Vec3 parentDir, float startRadius, TreeDefinition def,
                                RandomSource rand, List<List<Node>> allBranches, List<Vec3> leafAnchors) {
-        int steps = 5 + rand.nextInt(4); // 5–8 steps
-        Vec3 dir  = divergeDir(parentDir, 0.4, 0.55, 0.60, rand);
+        int steps = 5 + rand.nextInt(4);
+        Vec3 dir  = divergeDir(parentDir, 0.40, 0.55, 0.60, rand);
         List<Node> nodes = new ArrayList<>();
         Vec3 pos = startPos;
         double accX = 0, accZ = 0;
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
-            float radius = Math.max(0.15f, startRadius * (1.0f - t * 0.8f));
+            float radius = Math.max(0.22f, startRadius * (1.0f - t * 0.65f));
             nodes.add(new Node(pos, dir, radius));
 
             accX = accX * 0.70 + (rand.nextDouble() - 0.5) * 0.18;
@@ -316,34 +302,32 @@ public final class AncientOakGenerator {
 
         if (!nodes.isEmpty()) {
             allBranches.add(nodes);
-            // Tertiary endpoint is a leaf anchor
             leafAnchors.add(nodes.get(nodes.size() - 1).pos());
 
-            // Grow 1–2 twigs from random spots on the tertiary
-            int twigCount = rand.nextInt(3); // 0–2
+            int twigCount = rand.nextInt(3);
             for (int tw = 0; tw < twigCount; tw++) {
-                int idx = (int)(nodes.size() * (0.4 + rand.nextDouble() * 0.45));
+                int idx = (int) (nodes.size() * (0.4 + rand.nextDouble() * 0.45));
                 idx = Math.min(idx, nodes.size() - 1);
                 Node attach = nodes.get(idx);
-                growTwig(attach.pos(), attach.dir(), def, rand, allBranches, leafAnchors);
+                growTwig(attach.pos(), attach.dir(), rand, allBranches, leafAnchors);
             }
         }
     }
 
     // -----------------------------------------------------------------------
-    // Twig  (depth 4 — thinnest, terminates in leaf anchor)
+    // Twig  (depth 4)
     // -----------------------------------------------------------------------
 
-    private void growTwig(Vec3 startPos, Vec3 parentDir, TreeDefinition def, RandomSource rand,
+    private void growTwig(Vec3 startPos, Vec3 parentDir, RandomSource rand,
                            List<List<Node>> allBranches, List<Vec3> leafAnchors) {
-        int steps = 3 + rand.nextInt(3); // 3–5 steps
+        int steps = 3 + rand.nextInt(3);
         Vec3 dir  = divergeDir(parentDir, 0.45, 0.5, 0.75, rand);
         List<Node> nodes = new ArrayList<>();
         Vec3 pos = startPos;
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
-            float radius = Math.max(0.12f, 0.30f * (1.0f - t * 0.85f));
+            float radius = Math.max(0.12f, 0.28f * (1.0f - t * 0.80f));
             nodes.add(new Node(pos, dir, radius));
 
             Vec3 jitter = new Vec3(
@@ -361,29 +345,21 @@ public final class AncientOakGenerator {
     }
 
     // -----------------------------------------------------------------------
-    // Painting helpers
+    // Painting
     // -----------------------------------------------------------------------
 
-    /**
-     * Paints trunk nodes. Larger radii get extra offset sphere splats to
-     * simulate bark-mass irregularity — the surface looks sculpted, not smooth.
-     */
     private void paintTrunk(LevelAccessor level, List<Node> trunk, RandomSource rand) {
         for (Node n : trunk) {
             paintSphere(level, n.pos(), n.radius(), WOOD);
-            // Extra bark-mass splat at wide sections for sculpted, aged look
-            if (n.radius() > 1.8f) {
-                double ox = (rand.nextDouble() - 0.5) * n.radius() * 0.6;
-                double oz = (rand.nextDouble() - 0.5) * n.radius() * 0.6;
-                paintSphere(level, n.pos().add(ox, 0, oz), n.radius() * 0.55f, WOOD);
+            // Small bark-mass splat at base — kept subtle so it doesn't create blobs
+            if (n.radius() > 2.5f && rand.nextFloat() < 0.35f) {
+                double ox = (rand.nextDouble() - 0.5) * 1.2;
+                double oz = (rand.nextDouble() - 0.5) * 1.2;
+                paintSphere(level, n.pos().add(ox, 0, oz), n.radius() * 0.38f, WOOD);
             }
         }
     }
 
-    /**
-     * Paints root nodes, burying blocks that end up below the terrain surface.
-     * Roots are drawn with wood so they blend into the base.
-     */
     private void paintRoot(LevelAccessor level, List<Node> root) {
         for (Node n : root) {
             int r = Math.max(1, Mth.ceil(n.radius()));
@@ -391,7 +367,6 @@ public final class AncientOakGenerator {
                 if (dx * dx + dy * dy + dz * dz <= n.radius() * n.radius() + 0.5f) {
                     BlockPos p = BlockPos.containing(n.pos().x + dx, n.pos().y + dy, n.pos().z + dz);
                     BlockState existing = level.getBlockState(p);
-                    // Replace air and terrain; roots grow through ground
                     if (existing.isAir() || existing.is(Blocks.GRASS_BLOCK)
                             || existing.is(Blocks.DIRT) || existing.is(Blocks.PODZOL)
                             || existing.is(Blocks.COARSE_DIRT)) {
@@ -403,33 +378,45 @@ public final class AncientOakGenerator {
     }
 
     /**
-     * Places small, irregular leaf clusters at each anchor.
-     * Multiple overlapping ellipsoids create the clustered canopy-mass effect.
+     * Each leaf anchor gets a primary cluster (r=3-5) plus optional satellite lobes.
+     * Small clusters overlapping throughout the branch network give a natural
+     * broken-canopy look rather than a solid blob.
      */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors, TreeDefinition def, RandomSource rand) {
-        float density = Mth.clamp(def.leafDensity(), 0.35f, 0.92f);
+        float density = Mth.clamp(def.leafDensity(), 0.45f, 0.92f);
 
         for (Vec3 anchor : anchors) {
-            // Primary cluster — small, dense
-            int rx = 2 + rand.nextInt(2);
-            int ry = 2 + rand.nextInt(2);
-            int rz = 2 + rand.nextInt(2);
+            // Primary cluster — meaningfully sized
+            int rx = 3 + rand.nextInt(3); // 3-5
+            int ry = 2 + rand.nextInt(3); // 2-4
+            int rz = 3 + rand.nextInt(3); // 3-5
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
 
-            // Secondary lobe — offset, slightly larger, sparser
-            if (rand.nextFloat() < 0.55f) {
+            // Secondary lobe — offset outward, slightly sparser (high probability)
+            if (rand.nextFloat() < 0.72f) {
                 Vec3 offset = new Vec3(
-                        (rand.nextDouble() - 0.5) * 2.8,
-                        (rand.nextDouble() - 0.5) * 1.6,
-                        (rand.nextDouble() - 0.5) * 2.8);
-                int r2 = 2 + rand.nextInt(3);
-                paintEllipsoid(level, anchor.add(offset), r2, r2 - 1, r2, rand, density * 0.72f);
+                        (rand.nextDouble() - 0.5) * 3.0,
+                        (rand.nextDouble() - 0.5) * 1.8,
+                        (rand.nextDouble() - 0.5) * 3.0);
+                int r2 = 3 + rand.nextInt(3);
+                int r2y = Math.max(1, r2 - 1);
+                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.70f);
             }
 
-            // Occasional hanging drape below
-            if (rand.nextFloat() < 0.20f) {
+            // Tertiary lobe — adds canopy volume in a different direction
+            if (rand.nextFloat() < 0.40f) {
+                Vec3 offset2 = new Vec3(
+                        (rand.nextDouble() - 0.5) * 4.0,
+                        (rand.nextDouble() - 0.5) * 2.5,
+                        (rand.nextDouble() - 0.5) * 4.0);
+                int r3 = 2 + rand.nextInt(3);
+                paintEllipsoid(level, anchor.add(offset2), r3, r3, r3, rand, density * 0.55f);
+            }
+
+            // Hanging drape below branch tip
+            if (rand.nextFloat() < 0.25f) {
                 Vec3 drape = anchor.add(0, -(1 + rand.nextInt(2)), 0);
-                paintEllipsoid(level, drape, 2, 3, 2, rand, density * 0.55f);
+                paintEllipsoid(level, drape, 2, 3, 2, rand, density * 0.60f);
             }
         }
     }
@@ -438,24 +425,17 @@ public final class AncientOakGenerator {
     // Utilities
     // -----------------------------------------------------------------------
 
-    /** Picks {@code count} attachment indices spread across [minT, maxT] of {@code steps}. */
     private int[] pickAttachPoints(int steps, int count, float minT, float maxT, RandomSource rand) {
         int[] pts = new int[count];
         float span = maxT - minT;
         for (int i = 0; i < count; i++) {
-            float t = minT + (span * i / Math.max(1, count - 1)) + (rand.nextFloat() - 0.5f) * (span / (count + 1));
+            float t = minT + (span * i / Math.max(1, count - 1))
+                    + (rand.nextFloat() - 0.5f) * (span / (count + 1));
             pts[i] = Mth.clamp((int) (t * steps), 1, steps - 2);
         }
         return pts;
     }
 
-    /**
-     * Creates a branch direction that diverges organically from its parent.
-     *
-     * @param parentWeight  how much of the parent direction to inherit
-     * @param randomWeight  horizontal random spread influence
-     * @param upWeight      upward bias
-     */
     private Vec3 divergeDir(Vec3 parent, double parentWeight, double randomWeight, double upWeight, RandomSource rand) {
         Vec3 horiz = new Vec3(rand.nextDouble() - 0.5, 0, rand.nextDouble() - 0.5).normalize();
         return parent.scale(parentWeight)
