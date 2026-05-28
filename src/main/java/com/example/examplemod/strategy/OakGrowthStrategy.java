@@ -6,10 +6,8 @@ import net.minecraft.util.Mth;
 
 public final class OakGrowthStrategy implements GrowthStrategy {
     @Override
-    public TrunkPlan planTrunk(TreeDefinition d, GenerationContext c) {
+    public GrowthProfile profile(TreeDefinition d, GenerationContext c) {
         int h = Mth.nextInt(c.random(), d.minHeight(), d.maxHeight());
-        int lx = d.canLean() ? c.random().nextInt(3) - 1 : 0;
-        int lz = d.canLean() ? c.random().nextInt(3) - 1 : 0;
-        return new TrunkPlan(h, lx, lz, 0.75f, 0.55f);
+        return new GrowthProfile(h, 0.9f, 0.8f, 0.65f, 0.14f, 0.28f, 0.62f);
     }
 }
