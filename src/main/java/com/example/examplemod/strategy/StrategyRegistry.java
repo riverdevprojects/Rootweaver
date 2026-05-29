@@ -14,6 +14,7 @@ public final class StrategyRegistry {
         STRATEGIES.put(GrowthStyle.GIANT_FOREST, new OakGrowthStrategy());
         STRATEGIES.put(GrowthStyle.CUSTOM, new OakGrowthStrategy());
         STRATEGIES.put(GrowthStyle.ANCIENT_OAK, new OakGrowthStrategy());
+        STRATEGIES.put(GrowthStyle.BIRCH, new OakGrowthStrategy()); // bypassed — BirchGenerator handles BIRCH directly
     }
     public static GrowthStrategy resolve(GrowthStyle style) { return STRATEGIES.get(style); }
 }

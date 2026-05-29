@@ -24,6 +24,9 @@ public final class ProceduralTreeGenerator {
         if (definition.growthStyle() == GrowthStyle.ANCIENT_OAK) {
             return new AncientOakGenerator().generate(definition, ctx);
         }
+        if (definition.growthStyle() == GrowthStyle.BIRCH) {
+            return new BirchGenerator().generate(definition, ctx);
+        }
         LevelAccessor level = ctx.level();
         BlockPos base = TerrainAdapter.findSurface(level, ctx.origin());
         GrowthStrategy strategy = StrategyRegistry.resolve(definition.growthStyle());
