@@ -24,10 +24,10 @@ public final class DebugTreePresets {
         return TreeDefinition.builder("debug_oak")
                 .height(10, 16)
                 .trunkWidth(2, 3)
-                .branchDensity(0.85f)        // ARTSY [was: 0.80f]
-                .branchLength(7, 13)         // ARTSY [was: 6, 11]
+                .branchDensity(0.80f)
+                .branchLength(6, 11)
                 .leafDensity(0.80f)
-                .rootChance(0.45f)           // ARTSY [was: 0.35f]
+                .rootChance(0.35f)
                 .canLean(true)
                 .canSplitTrunk(true)
                 .maxRecursionDepth(3)

@@ -100,17 +100,16 @@ public final class AncientOakGenerator {
             // Natural taper: stays wide throughout — top stays at 1.4 radius (nearly 3 blocks wide)
             float natural = Mth.lerp(t, def.maxTrunkWidth() * 0.58f, 1.4f);
 
-            // ARTSY [was: t < 0.28f, pow(..., 1.6), maxTrunkWidth * 0.48f]
-            // Dramatic buttress flare extending over first 40% of height — power 1.3 for chunky roll-off
-            float flare = t < 0.40f
-                    ? (float) Math.pow(1.0 - t / 0.40, 1.3) * (def.maxTrunkWidth() * 0.75f)
+            // Gradual base flare extending over first 28% of height — power 1.6 for smooth roll-off
+            float flare = t < 0.28f
+                    ? (float) Math.pow(1.0 - t / 0.28, 1.6) * (def.maxTrunkWidth() * 0.48f)
                     : 0.0f;
 
             float radius = natural + flare;
 
-            // ARTSY [was: 0.05f chance, 0.2f + 0.25f size] — more frequent, larger bark knobs
-            if (rand.nextFloat() < 0.15f && t > 0.05f && t < 0.93f) {
-                radius += 0.40f + rand.nextFloat() * 0.55f;
+            // Occasional bark bulge — keeps effect subtle
+            if (rand.nextFloat() < 0.05f && t > 0.08f && t < 0.92f) {
+                radius += 0.2f + rand.nextFloat() * 0.25f;
             }
 
             nodes.add(new Node(pos, dir, radius));
@@ -148,13 +147,11 @@ public final class AncientOakGenerator {
         List<Node> nodes = new ArrayList<>();
         // Scale root length with minBranchLength: shorter roots on young trees
         int steps = def.minBranchLength() - 2 + rand.nextInt(5);
-        // ARTSY [was: maxTrunkWidth * 0.28f + 0.3f, min 0.5f] — bigger, more visible buttress roots
-        float startRadius = def.maxTrunkWidth() * 0.48f + rand.nextFloat() * 0.42f;
-        startRadius = Math.max(0.65f, startRadius);
+        float startRadius = def.maxTrunkWidth() * 0.28f + rand.nextFloat() * 0.3f;
+        startRadius = Math.max(0.5f, startRadius);
 
-        // ARTSY [was: outward 0.75+0.35, downward 0.08+0.18] — roots spread wider and stay shallower
-        double outward  = 1.05 + rand.nextDouble() * 0.55;
-        double downward = -(0.03 + rand.nextDouble() * 0.10);
+        double outward  = 0.75 + rand.nextDouble() * 0.35;
+        double downward = -(0.08 + rand.nextDouble() * 0.18);
 
         Vec3 dir = new Vec3(Math.cos(angle) * outward, downward, Math.sin(angle) * outward).normalize();
         Vec3 pos = new Vec3(base.getX() + 0.5, base.getY(), base.getZ() + 0.5);
@@ -196,8 +193,8 @@ public final class AncientOakGenerator {
             int primarySteps  = def.maxBranchLength() + rand.nextInt(Math.max(2, def.maxBranchLength() / 4));
             double stepSize   = 0.90 + rand.nextDouble() * 0.25;
 
-            // ARTSY [was: 0.30 + rand.nextDouble() * 0.38] — flatter 7-21° so branches spread wide and sag dramatically
-            double elevation = 0.12 + rand.nextDouble() * 0.25;
+            // Branches sweep outward AND upward — 17-40° elevation gives classic oak arc shape
+            double elevation = 0.30 + rand.nextDouble() * 0.38;
             Vec3 outDir  = new Vec3(Math.cos(angle), 0, Math.sin(angle));
             Vec3 initDir = outDir.scale(Math.cos(elevation))
                     .add(0, Math.sin(elevation), 0).normalize();
@@ -245,9 +242,8 @@ public final class AncientOakGenerator {
             accX = accX * 0.78 + (rand.nextDouble() - 0.5) * 0.10;
             accZ = accZ * 0.78 + (rand.nextDouble() - 0.5) * 0.10;
 
-            // ARTSY [was: sag * -0.10, lightSeek 0.035 + t * 0.045] — more dramatic droop
-            double sag       = Math.sin(Math.PI * t) * -0.22;
-            double lightSeek = 0.012 + t * 0.030;
+            double sag       = Math.sin(Math.PI * t) * -0.10;
+            double lightSeek = 0.035 + t * 0.045;
             dir = dir.add(accX, sag + lightSeek, accZ).normalize();
             pos = pos.add(dir.scale(stepSize));
         }
@@ -370,17 +366,11 @@ public final class AncientOakGenerator {
     private void paintTrunk(LevelAccessor level, List<Node> trunk, RandomSource rand) {
         for (Node n : trunk) {
             paintSphere(level, n.pos(), n.radius(), wood);
-            // ARTSY [was: radius > 2.5f, chance 0.35f, offset *1.2, radius *0.38f] — knobby bark splats
-            if (n.radius() > 1.8f && rand.nextFloat() < 0.62f) {
-                double ox = (rand.nextDouble() - 0.5) * 1.8;
-                double oz = (rand.nextDouble() - 0.5) * 1.8;
-                paintSphere(level, n.pos().add(ox, 0, oz), n.radius() * 0.52f, wood);
-            }
-            // ARTSY: added second smaller offset splat for extra trunk texture
-            if (n.radius() > 2.0f && rand.nextFloat() < 0.22f) {
-                double ox2 = (rand.nextDouble() - 0.5) * 2.2;
-                double oz2 = (rand.nextDouble() - 0.5) * 2.2;
-                paintSphere(level, n.pos().add(ox2, -0.4, oz2), n.radius() * 0.30f, wood);
+            // Small bark-mass splat at base — kept subtle so it doesn't create blobs
+            if (n.radius() > 2.5f && rand.nextFloat() < 0.35f) {
+                double ox = (rand.nextDouble() - 0.5) * 1.2;
+                double oz = (rand.nextDouble() - 0.5) * 1.2;
+                paintSphere(level, n.pos().add(ox, 0, oz), n.radius() * 0.38f, wood);
             }
         }
     }
@@ -413,51 +403,39 @@ public final class AncientOakGenerator {
         float branchScale = def.maxBranchLength() / 20.0f;
 
         for (Vec3 anchor : anchors) {
-            // ARTSY [was: rx=2+nextInt(1+(int)(branchScale*3)), ry=max(1,rx-1)+nextInt(2)]
-            // Primary cluster — bigger for more presence
-            int rx = 3 + rand.nextInt(1 + (int)(branchScale * 4)); // 3-4 young, 3-7 old
-            int ry = Math.max(2, rx - 1) + rand.nextInt(2);
-            int rz = 3 + rand.nextInt(1 + (int)(branchScale * 4));
+            // Primary cluster — scaled with tree age
+            int rx = 2 + rand.nextInt(1 + (int)(branchScale * 3)); // 2-3 young, 2-5 old
+            int ry = Math.max(1, rx - 1) + rand.nextInt(2);
+            int rz = 2 + rand.nextInt(1 + (int)(branchScale * 3));
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
 
-            // ARTSY [was: 0.72f, lobeRange 1.5+*0.075, density*0.70f] — nearly always, wider spread
-            if (rand.nextFloat() < 0.90f) {
-                double lobeRange = 2.2 + def.maxBranchLength() * 0.12;
+            // Secondary lobe — spread scales with branch length so young oaks stay compact
+            if (rand.nextFloat() < 0.72f) {
+                double lobeRange = 1.5 + def.maxBranchLength() * 0.075;
                 Vec3 offset = new Vec3(
                         (rand.nextDouble() - 0.5) * lobeRange,
                         (rand.nextDouble() - 0.5) * lobeRange * 0.6,
                         (rand.nextDouble() - 0.5) * lobeRange);
-                int r2 = 2 + rand.nextInt(2 + (int)(branchScale * 3));
+                int r2 = 2 + rand.nextInt(1 + (int)(branchScale * 3));
                 int r2y = Math.max(1, r2 - 1);
-                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.78f);
+                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.70f);
             }
 
-            // ARTSY [was: 0.40f, terRange 2.0+*0.1, density*0.55f] — more frequent, wider
-            if (rand.nextFloat() < 0.68f) {
-                double terRange = 2.8 + def.maxBranchLength() * 0.14;
+            // Tertiary lobe — adds canopy volume in a different direction
+            if (rand.nextFloat() < 0.40f) {
+                double terRange = 2.0 + def.maxBranchLength() * 0.1;
                 Vec3 offset2 = new Vec3(
                         (rand.nextDouble() - 0.5) * terRange,
                         (rand.nextDouble() - 0.5) * terRange * 0.625,
                         (rand.nextDouble() - 0.5) * terRange);
-                int r3 = 2 + rand.nextInt(2 + (int)(branchScale * 2));
-                paintEllipsoid(level, anchor.add(offset2), r3, r3, r3, rand, density * 0.65f);
+                int r3 = 2 + rand.nextInt(1 + (int)(branchScale * 2));
+                paintEllipsoid(level, anchor.add(offset2), r3, r3, r3, rand, density * 0.55f);
             }
 
-            // ARTSY [was: 0.25f, -(1+nextInt(2)), density*0.60f] — more frequent, longer drape
-            if (rand.nextFloat() < 0.52f) {
-                Vec3 drape = anchor.add(0, -(1 + rand.nextInt(3)), 0);
-                paintEllipsoid(level, drape, 2, 3, 2, rand, density * 0.72f);
-            }
-
-            // ARTSY: added quaternary lobe for extra irregular canopy silhouette
-            if (rand.nextFloat() < 0.32f) {
-                double qRange = 2.2 + def.maxBranchLength() * 0.10;
-                Vec3 offset3 = new Vec3(
-                        (rand.nextDouble() - 0.5) * qRange,
-                        rand.nextDouble() * qRange * 0.35,
-                        (rand.nextDouble() - 0.5) * qRange);
-                int r4 = 1 + rand.nextInt(2 + (int)(branchScale * 2));
-                paintEllipsoid(level, anchor.add(offset3), r4, r4, r4, rand, density * 0.52f);
+            // Hanging drape below branch tip
+            if (rand.nextFloat() < 0.25f) {
+                Vec3 drape = anchor.add(0, -(1 + rand.nextInt(2)), 0);
+                paintEllipsoid(level, drape, 2, 3, 2, rand, density * 0.60f);
             }
         }
     }
