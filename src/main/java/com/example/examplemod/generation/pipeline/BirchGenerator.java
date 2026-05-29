@@ -90,10 +90,9 @@ public final class BirchGenerator {
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
 
-            // Gentle taper with no base flare: maxTrunkWidth=2 → radius 0.96 at base, 0.35 at crown.
-            // The + cross pattern (3 blocks wide) collapses to a single-block column above ~40% height,
-            // keeping the upper trunk visible and slender through the canopy.
-            float radius = Mth.lerp(t, def.maxTrunkWidth() * 0.48f, 0.35f);
+            // Keep radius below the paintSphere threshold (sqrt(0.5) ≈ 0.707) at all heights
+            // so the trunk is a uniform single-block column from ground to crown — no chunky base.
+            float radius = Mth.lerp(t, 0.62f, 0.38f);
 
             nodes.add(new Node(pos, dir, radius));
 
