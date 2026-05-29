@@ -15,6 +15,7 @@ public final class DebugTreePresets {
         TreeRegistry.register(ArborPresets.giant("debug_giant"));
         TreeRegistry.register(buildOldOak());
         TreeRegistry.register(buildBirch());
+        TreeRegistry.register(buildRedwood());
     }
 
     /**
@@ -61,6 +62,30 @@ public final class DebugTreePresets {
                 .heightVariation(0.25f)
                 .branchVariation(0.30f)
                 .canopyVariation(0.25f)
+                .build();
+    }
+
+    /**
+     * Towering coastal redwood — monumental, vertical, ancient.
+     * Uses RedwoodGenerator via GrowthStyle.REDWOOD.
+     * Spawn with: /arbor spawn debug_redwood
+     */
+    private static TreeDefinition buildRedwood() {
+        return TreeDefinition.builder("debug_redwood")
+                .height(40, 72)
+                .trunkWidth(4, 7)
+                .branchDensity(0.60f)
+                .branchLength(8, 14)
+                .leafDensity(0.65f)
+                .rootChance(0.80f)
+                .canLean(true)
+                .canSplitTrunk(false)
+                .maxRecursionDepth(3)
+                .growthStyle(GrowthStyle.REDWOOD)
+                .leafShape(LeafShape.OVAL)
+                .heightVariation(0.35f)
+                .branchVariation(0.25f)
+                .canopyVariation(0.30f)
                 .build();
     }
 
