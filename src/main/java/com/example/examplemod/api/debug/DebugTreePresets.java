@@ -14,6 +14,7 @@ public final class DebugTreePresets {
         TreeRegistry.register(ArborPresets.pine("debug_pine"));
         TreeRegistry.register(ArborPresets.giant("debug_giant"));
         TreeRegistry.register(buildOldOak());
+        TreeRegistry.register(buildBirch());
     }
 
     /**
@@ -36,6 +37,30 @@ public final class DebugTreePresets {
                 .heightVariation(0.20f)
                 .branchVariation(0.25f)
                 .canopyVariation(0.30f)
+                .build();
+    }
+
+    /**
+     * Slender woodland birch — elegant, vertical, airy.
+     * Uses BirchGenerator via GrowthStyle.BIRCH.
+     * Spawn with: /arbor spawn debug_birch
+     */
+    private static TreeDefinition buildBirch() {
+        return TreeDefinition.builder("debug_birch")
+                .height(12, 20)
+                .trunkWidth(1, 2)
+                .branchDensity(0.70f)
+                .branchLength(4, 8)
+                .leafDensity(0.55f)
+                .rootChance(0.0f)
+                .canLean(true)
+                .canSplitTrunk(false)
+                .maxRecursionDepth(2)
+                .growthStyle(GrowthStyle.BIRCH)
+                .leafShape(LeafShape.SPHERICAL)
+                .heightVariation(0.25f)
+                .branchVariation(0.30f)
+                .canopyVariation(0.25f)
                 .build();
     }
 
