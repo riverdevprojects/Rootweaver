@@ -176,13 +176,14 @@ public final class RedwoodGenerator {
     private void growAllBranches(List<Node> trunk, TreeDefinition def, RandomSource rand,
                                   List<List<Node>> allBranches, List<Vec3> leafAnchors) {
         int trunkSize    = trunk.size();
-        int primaryCount = 4 + rand.nextInt(Math.max(1, (int)(def.branchDensity() * 4)));
+        // More primary branches for better canopy coverage
+        int primaryCount = 6 + rand.nextInt(Math.max(1, (int)(def.branchDensity() * 5)));
 
         for (int b = 0; b < primaryCount; b++) {
             double angle = (2 * Math.PI * b / primaryCount)
                     + (rand.nextDouble() - 0.5) * (Math.PI / primaryCount);
 
-            // Branches only from upper 45-92% — lower trunk bare, creating the monumental column
+            // Branches only from upper 45-92% — lower trunk bare, monumental column
             float tSpawn = 0.45f + rand.nextFloat() * 0.47f;
             int spawnIdx = Math.min(trunkSize - 2, (int)(tSpawn * trunkSize));
             Node spawn   = trunk.get(spawnIdx);
@@ -190,15 +191,20 @@ public final class RedwoodGenerator {
             // Dead limb in 45-62% zone — short, bare, adds ancient aged character
             boolean isDead = tSpawn < 0.62f && rand.nextFloat() < 0.40f;
 
+            // Cone shape: higher branches are shorter, lower branches longer
+            float heightScale = 1.0f - (tSpawn - 0.45f) / 0.47f * 0.55f; // 1.0 at bottom, 0.45 at top
+            int baseLen = def.minBranchLength() + rand.nextInt(Math.max(1, def.maxBranchLength() - def.minBranchLength()));
             int primarySteps = isDead
-                    ? 4 + rand.nextInt(5)
-                    : def.minBranchLength() + 2 + rand.nextInt(Math.max(1, def.maxBranchLength() - def.minBranchLength()));
+                    ? 4 + rand.nextInt(4)
+                    : Math.max(5, (int)(baseLen * heightScale));
 
-            // Nearly horizontal: 5-25° elevation (oak uses 17-40°)
-            // Branches start level then arc upward gently as they extend
-            double elevAngle = Math.toRadians(5.0 + rand.nextDouble() * 20.0);
+            // Slightly downward initial angle for lower branches, flat for upper — classic redwood droop
+            double elevDeg = tSpawn < 0.70f
+                    ? -5.0 - rand.nextDouble() * 10.0   // lower branches droop
+                    : -2.0 + rand.nextDouble() * 8.0;   // upper branches nearly flat
+            double elevAngle = Math.toRadians(elevDeg);
             Vec3 outDir  = new Vec3(Math.cos(angle), 0, Math.sin(angle));
-            Vec3 initDir = outDir.scale(Math.cos(elevAngle))
+            Vec3 initDir = outDir.scale(Math.cos(Math.abs(elevAngle)))
                     .add(0, Math.sin(elevAngle), 0).normalize();
 
             float primaryRadius = Math.max(0.55f, spawn.radius() * (0.32f + rand.nextFloat() * 0.14f));
@@ -223,9 +229,10 @@ public final class RedwoodGenerator {
         Vec3 dir = startDir;
         double accX = 0, accZ = 0;
 
-        int secCount = isDead ? 0 : (1 + rand.nextInt(3));
+        // Guarantee at least 2 secondaries on live branches for reliable coverage
+        int secCount = isDead ? 0 : (2 + rand.nextInt(3));
         int[] secPositions = secCount > 0
-                ? pickAttachPoints(steps, secCount, 0.30f, 0.80f, rand)
+                ? pickAttachPoints(steps, secCount, 0.25f, 0.85f, rand)
                 : new int[0];
 
         for (int i = 0; i < steps; i++) {
@@ -243,8 +250,8 @@ public final class RedwoodGenerator {
             accX = accX * 0.80 + (rand.nextDouble() - 0.5) * 0.07;
             accZ = accZ * 0.80 + (rand.nextDouble() - 0.5) * 0.07;
 
-            // Gentle upward arc — branches angle toward light as they extend, no sag
-            double upCurve = 0.025 + t * 0.035;
+            // Slight droop as branch extends outward — redwood branches hang, not lift
+            double upCurve = 0.005 - t * 0.020;
             dir = dir.add(accX, upCurve, accZ).normalize();
             pos = pos.add(dir.scale(0.85));
         }
@@ -268,8 +275,9 @@ public final class RedwoodGenerator {
         Vec3 pos = startPos;
         double accX = 0, accZ = 0;
 
-        int tertiaryCount = 1 + rand.nextInt(2);
-        int[] tertiaryPositions = pickAttachPoints(steps, tertiaryCount, 0.30f, 0.80f, rand);
+        // More tertiaries = more foliage coverage — guarantee at least 2
+        int tertiaryCount = 2 + rand.nextInt(2);
+        int[] tertiaryPositions = pickAttachPoints(steps, tertiaryCount, 0.25f, 0.85f, rand);
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
@@ -367,29 +375,22 @@ public final class RedwoodGenerator {
     }
 
     /**
-     * Redwood foliage — dense flat horizontal sprays along branch length.
-     * Individual clusters are wide and flat (wider-than-tall) to mimic the
-     * feathery, horizontal spray habit of coast redwood foliage.
-     * Overall silhouette stays narrow because anchors are concentrated along
-     * near-horizontal upper branches, not scattered spherically.
+     * Redwood foliage — small oval clusters distributed along the full branch
+     * hierarchy. Kept small so individual clusters don't merge into an oak blob;
+     * the density comes from having many anchors, not from large cluster radii.
+     * Slightly taller-than-wide to hint at the narrow spire silhouette.
      */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors,
                                     TreeDefinition def, RandomSource rand) {
-        float density = Mth.clamp(def.leafDensity(), 0.55f, 0.82f);
+        // Lower per-cluster density — fullness comes from anchor count, not blob size
+        float density = Mth.clamp(def.leafDensity() * 0.75f, 0.40f, 0.62f);
 
         for (Vec3 anchor : anchors) {
-            // Flat horizontal spray: wide in X/Z, compressed in Y
-            int rx = 3 + rand.nextInt(3); // 3-5 wide
-            int ry = 1 + rand.nextInt(2); // 1-2 tall — flat disc
-            int rz = 3 + rand.nextInt(3);
+            // Small oval: 2 wide, 2-3 tall — redwood foliage in compact upright tufts
+            int rx = 1 + rand.nextInt(2); // 1-2
+            int ry = rx + rand.nextInt(2); // rx to rx+1
+            int rz = 1 + rand.nextInt(2);
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
-
-            // Small secondary puff just above — adds slight vertical volume without going oak-round
-            if (rand.nextFloat() < 0.45f) {
-                Vec3 up = anchor.add(0, 1 + rand.nextInt(2), 0);
-                int r2 = 2 + rand.nextInt(2);
-                paintEllipsoid(level, up, r2, 1, r2, rand, density * 0.55f);
-            }
         }
     }
 
