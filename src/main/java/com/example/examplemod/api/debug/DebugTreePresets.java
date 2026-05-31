@@ -26,7 +26,7 @@ public final class DebugTreePresets {
      */
     private static TreeDefinition buildCommonOak() {
         return TreeDefinition.builder("debug_oak")
-                .height(6, 10)
+                .height(6, 8)
                 .trunkWidth(1, 1)
                 .branchDensity(0.0f)
                 .branchLength(0, 2)
