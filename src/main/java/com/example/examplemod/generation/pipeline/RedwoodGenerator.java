@@ -233,6 +233,13 @@ public final class RedwoodGenerator {
             float radius = Math.max(isDead ? 0.30f : 0.50f, startRadius * (1.0f - t * 0.62f));
             nodes.add(new Node(pos, dir, radius));
 
+            // Live redwood branches carry foliage in flat pads along the branch,
+            // not only as one large tuft at the tip. Interior anchors add crown
+            // volume while preserving the original trunk/branch height.
+            if (!isDead && (i == Math.max(1, steps / 2) || i == Math.max(1, (steps * 3) / 4))) {
+                leafAnchors.add(pos);
+            }
+
             for (int sp : secPositions) {
                 if (sp == i) {
                     float secRadius = Math.max(0.35f, radius * (0.50f + rand.nextFloat() * 0.15f));
@@ -275,6 +282,12 @@ public final class RedwoodGenerator {
             float t = i / (float) Math.max(1, steps - 1);
             float radius = Math.max(0.28f, startRadius * (1.0f - t * 0.60f));
             nodes.add(new Node(pos, dir, radius));
+
+            // Add a modest pad in the middle of secondary limbs so the crown forms
+            // layered shelves instead of isolated balls at the tips.
+            if (i == Math.max(1, steps / 2)) {
+                leafAnchors.add(pos);
+            }
 
             for (int sp : tertiaryPositions) {
                 if (sp == i) {
