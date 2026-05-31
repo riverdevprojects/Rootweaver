@@ -30,6 +30,9 @@ public final class ProceduralTreeGenerator {
         if (definition.growthStyle() == GrowthStyle.REDWOOD) {
             return new RedwoodGenerator().generate(definition, ctx);
         }
+        if (definition.growthStyle() == GrowthStyle.SPRUCE) {
+            return new SpruceGenerator().generate(definition, ctx);
+        }
         LevelAccessor level = ctx.level();
         BlockPos base = TerrainAdapter.findSurface(level, ctx.origin());
         GrowthStrategy strategy = StrategyRegistry.resolve(definition.growthStyle());
