@@ -359,43 +359,71 @@ public final class RedwoodGenerator {
     }
 
     /**
-     * Layered canopy masses — tall-and-narrow clusters, open sky between sections.
-     * Clusters are vertically elongated and biased upward to form distinct crown layers
-     * rather than a solid spherical blob.
+     * Layered canopy masses — expanded crown pads with open sky between sections.
+     * Clusters are wider, vertically stacked, and biased into offset shelves so the
+     * upper crown reads as a much larger old-growth redwood canopy without changing
+     * the trunk, roots, or branch structure that creates the tree beneath it.
      */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors,
                                     TreeDefinition def, RandomSource rand) {
-        float density = Mth.clamp(def.leafDensity(), 0.48f, 0.78f);
+        float density = Mth.clamp(def.leafDensity(), 0.55f, 0.82f);
         float branchScale = def.maxBranchLength() / 18.0f;
 
         for (Vec3 anchor : anchors) {
-            // Primary cluster: taller than wide — narrow evergreen silhouette
-            int rx = 1 + rand.nextInt(1 + (int)(branchScale * 2));
-            int ry = rx + 1 + rand.nextInt(2);
-            int rz = 1 + rand.nextInt(1 + (int)(branchScale * 2));
+            // Primary cluster: noticeably larger than the first pass, but still oval
+            // instead of spherical so individual branch pads remain readable.
+            int rx = 2 + rand.nextInt(2 + (int)(branchScale * 3));
+            int ry = rx + 1 + rand.nextInt(3);
+            int rz = 2 + rand.nextInt(2 + (int)(branchScale * 3));
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
 
-            // Secondary lobe: offset upward for layered crown feel
-            if (rand.nextFloat() < 0.60f) {
-                double lobeRange = 1.2 + def.maxBranchLength() * 0.055;
+            // Build a guaranteed side shelf from every live branch tip. These pads
+            // widen the silhouette and turn sparse branch-end tufts into a crown.
+            double shelfRange = 2.0 + def.maxBranchLength() * 0.12;
+            Vec3 shelfOffset = new Vec3(
+                    (rand.nextDouble() - 0.5) * shelfRange,
+                    (rand.nextDouble() - 0.35) * shelfRange * 0.35,
+                    (rand.nextDouble() - 0.5) * shelfRange);
+            int shelfRx = Math.max(2, rx - 1 + rand.nextInt(3));
+            int shelfRy = Math.max(2, ry - 1);
+            int shelfRz = Math.max(2, rz - 1 + rand.nextInt(3));
+            paintEllipsoid(level, anchor.add(shelfOffset), shelfRx, shelfRy, shelfRz, rand, density * 0.74f);
+
+            // Upper lobe: offsets upward to create stepped canopy layers rather than
+            // one compact cap sitting on top of the trunk.
+            if (rand.nextFloat() < 0.90f) {
+                double lobeRange = 2.4 + def.maxBranchLength() * 0.13;
                 Vec3 offset = new Vec3(
                         (rand.nextDouble() - 0.5) * lobeRange,
-                        rand.nextDouble() * lobeRange * 0.5,
+                        0.8 + rand.nextDouble() * lobeRange * 0.55,
                         (rand.nextDouble() - 0.5) * lobeRange);
-                int r2  = 1 + rand.nextInt(1 + (int)(branchScale * 2));
-                int r2y = r2 + rand.nextInt(2);
-                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.65f);
+                int r2  = 2 + rand.nextInt(2 + (int)(branchScale * 2));
+                int r2y = r2 + 1 + rand.nextInt(3);
+                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.66f);
             }
 
-            // Occasional third lobe — breaks up any remaining regularity
-            if (rand.nextFloat() < 0.25f) {
-                double terRange = 1.5 + def.maxBranchLength() * 0.07;
+            // Lower/backfill lobe: adds mass under the shelf so the canopy looks
+            // layered and draping instead of like isolated balls at branch tips.
+            if (rand.nextFloat() < 0.70f) {
+                double lowerRange = 2.0 + def.maxBranchLength() * 0.10;
                 Vec3 offset2 = new Vec3(
-                        (rand.nextDouble() - 0.5) * terRange,
-                        rand.nextDouble() * terRange * 0.4,
-                        (rand.nextDouble() - 0.5) * terRange);
-                int r3 = 1 + rand.nextInt(2);
-                paintEllipsoid(level, anchor.add(offset2), r3, r3 + 1, r3, rand, density * 0.45f);
+                        (rand.nextDouble() - 0.5) * lowerRange,
+                        -0.8 - rand.nextDouble() * lowerRange * 0.30,
+                        (rand.nextDouble() - 0.5) * lowerRange);
+                int r3 = 2 + rand.nextInt(2);
+                paintEllipsoid(level, anchor.add(offset2), r3 + 1, r3, r3 + 1, rand, density * 0.50f);
+            }
+
+            // A small ragged accent keeps the enlarged canopy irregular instead of
+            // turning it into a uniform blob.
+            if (rand.nextFloat() < 0.45f) {
+                double accentRange = 3.0 + def.maxBranchLength() * 0.12;
+                Vec3 offset3 = new Vec3(
+                        (rand.nextDouble() - 0.5) * accentRange,
+                        (rand.nextDouble() - 0.25) * accentRange * 0.45,
+                        (rand.nextDouble() - 0.5) * accentRange);
+                int r4 = 1 + rand.nextInt(2);
+                paintEllipsoid(level, anchor.add(offset3), r4 + 1, r4 + 1, r4 + 1, rand, density * 0.42f);
             }
         }
     }
