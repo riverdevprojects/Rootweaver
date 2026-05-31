@@ -10,21 +10,45 @@ public final class DebugTreePresets {
     private DebugTreePresets() {}
 
     public static void bootstrap() {
-        TreeRegistry.register(buildOak());
+        TreeRegistry.register(buildCommonOak());
         TreeRegistry.register(ArborPresets.pine("debug_pine"));
         TreeRegistry.register(ArborPresets.giant("debug_giant"));
-        TreeRegistry.register(buildOldOak());
+        TreeRegistry.register(buildLegendOak());
+        TreeRegistry.register(buildLegendOldOak());
         TreeRegistry.register(buildBirch());
         TreeRegistry.register(buildRedwood());
         TreeRegistry.register(buildSpruce());
     }
 
     /**
-     * Mature woodland oak — same biological family as old-growth but younger and more common.
+     * Common rounded-canopy oak — compact workhorse tree, designed to cluster.
      * Spawn with: /arbor spawn debug_oak
      */
-    private static TreeDefinition buildOak() {
+    private static TreeDefinition buildCommonOak() {
         return TreeDefinition.builder("debug_oak")
+                .height(6, 10)
+                .trunkWidth(1, 1)
+                .branchDensity(0.0f)
+                .branchLength(0, 2)
+                .leafDensity(0.90f)
+                .rootChance(0.0f)
+                .canLean(true)
+                .canSplitTrunk(false)
+                .maxRecursionDepth(1)
+                .growthStyle(GrowthStyle.COMMON_OAK)
+                .leafShape(LeafShape.SPHERICAL)
+                .heightVariation(0.25f)
+                .branchVariation(0.0f)
+                .canopyVariation(0.30f)
+                .build();
+    }
+
+    /**
+     * Legend-tier mature woodland oak — set-piece quality, placed at low density.
+     * Spawn with: /arbor spawn debug_legend_oak
+     */
+    private static TreeDefinition buildLegendOak() {
+        return TreeDefinition.builder("debug_legend_oak")
                 .height(10, 16)
                 .trunkWidth(2, 3)
                 .branchDensity(0.80f)
@@ -116,12 +140,12 @@ public final class DebugTreePresets {
     }
 
     /**
-     * Ancient sprawling oak — LOTR / old-growth aesthetic.
+     * Legend-tier ancient sprawling oak — LOTR / old-growth set-piece.
      * Uses AncientOakGenerator via GrowthStyle.ANCIENT_OAK.
-     * Spawn with: /arbor spawn debug_old_oak
+     * Spawn with: /arbor spawn debug_legend_old_oak
      */
-    private static TreeDefinition buildOldOak() {
-        return TreeDefinition.builder("debug_old_oak")
+    private static TreeDefinition buildLegendOldOak() {
+        return TreeDefinition.builder("debug_legend_old_oak")
                 .height(28, 42)
                 .trunkWidth(4, 6)
                 .branchDensity(0.90f)
