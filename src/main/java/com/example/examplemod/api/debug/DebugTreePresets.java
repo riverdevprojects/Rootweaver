@@ -16,6 +16,7 @@ public final class DebugTreePresets {
         TreeRegistry.register(buildOldOak());
         TreeRegistry.register(buildBirch());
         TreeRegistry.register(buildRedwood());
+        TreeRegistry.register(buildSpruce());
     }
 
     /**
@@ -86,6 +87,31 @@ public final class DebugTreePresets {
                 .heightVariation(0.35f)
                 .branchVariation(0.25f)
                 .canopyVariation(0.30f)
+                .build();
+    }
+
+    /**
+     * Cold-climate conifer — dense, layered, evergreen.
+     * Uses SpruceGenerator via GrowthStyle.SPRUCE.
+     * Triangular silhouette emerges from branch architecture (whorls that shorten toward crown).
+     * Spawn with: /arbor spawn debug_spruce
+     */
+    private static TreeDefinition buildSpruce() {
+        return TreeDefinition.builder("debug_spruce")
+                .height(18, 30)
+                .trunkWidth(1, 3)
+                .branchDensity(0.72f)
+                .branchLength(5, 10)
+                .leafDensity(0.72f)
+                .rootChance(0.0f)
+                .canLean(false)
+                .canSplitTrunk(false)
+                .maxRecursionDepth(2)
+                .growthStyle(GrowthStyle.SPRUCE)
+                .leafShape(LeafShape.CONICAL)
+                .heightVariation(0.20f)
+                .branchVariation(0.22f)
+                .canopyVariation(0.20f)
                 .build();
     }
 
