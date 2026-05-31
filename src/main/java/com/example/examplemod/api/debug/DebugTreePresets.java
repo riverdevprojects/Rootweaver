@@ -99,7 +99,7 @@ public final class DebugTreePresets {
     private static TreeDefinition buildSpruce() {
         return TreeDefinition.builder("debug_spruce")
                 .height(18, 30)
-                .trunkWidth(1, 3)
+                .trunkWidth(1, 1)
                 .branchDensity(0.72f)
                 .branchLength(5, 10)
                 .leafDensity(0.72f)

@@ -18,13 +18,14 @@ import java.util.List;
  * Procedural spruce generator — cold-climate conifer, dense and layered.
  *
  * Design contract:
- *  - Near-vertical trunk: straight pillar, no dramatic bends, gradual taper only
- *  - Whorl-based branching: distinct elevation tiers radiating from trunk at golden-angle offsets
- *  - Branch length decreases linearly bottom→top — this is what creates the triangular silhouette
- *  - Branches angle slightly downward, sag gently under foliage weight
- *  - Foliage painted as flat horizontal discs per whorl, hugging branch geometry not floating blobs
- *  - Strong central leader terminates in a narrow elongated apex spike
- *  - Lower trunk (bottom 15%) left bare for visual weight at ground level
+ *  - Thin single-block trunk: constant ~0.52 radius throughout, very slight taper
+ *  - Whorl-based branching: distinct elevation tiers rotating by golden angle
+ *  - Branch length decreases bottom→top — triangular silhouette from architecture alone
+ *  - Branches angle slightly downward, sag gently; painted as thin sticks (hidden by foliage)
+ *  - Foliage painted as 4-layer-thick horizontal discs per whorl — dense and full
+ *  - Disc radius = branch reach + padding so foliage completely covers branch wood
+ *  - Strong central leader terminates in narrow elongated apex spike
+ *  - Lower trunk (bottom 15%) bare for ground-level visual weight
  */
 public final class SpruceGenerator {
 
@@ -54,19 +55,19 @@ public final class SpruceGenerator {
 
         growWhorlBranches(trunk, def, rand, allBranches, whorls);
 
+        // Foliage first so trunk/branch wood overwrites leaf blocks, keeping structure visible
+        paintWhorlFoliage(level, whorls, def, rand);
+        paintApex(level, trunk, rand);
         paintTrunk(level, trunk);
         for (List<Node> branch : allBranches) {
             paintBranch(level, branch);
         }
 
-        paintWhorlFoliage(level, whorls, def, rand);
-        paintApex(level, trunk, rand);
-
         return true;
     }
 
     // -----------------------------------------------------------------------
-    // Trunk — near-vertical pillar, smooth gradual taper, no flare
+    // Trunk — thin single-block column, near-perfectly vertical
     // -----------------------------------------------------------------------
 
     private List<Node> growTrunk(BlockPos base, TreeDefinition def, RandomSource rand) {
@@ -77,9 +78,8 @@ public final class SpruceGenerator {
 
         Vec3 pos = new Vec3(base.getX() + 0.5, base.getY(), base.getZ() + 0.5);
 
-        // Minimal lean — spruce grows efficiently vertical
         double leanAngle    = rand.nextDouble() * 2 * Math.PI;
-        double leanStrength = 0.001 + rand.nextDouble() * 0.004;
+        double leanStrength = 0.001 + rand.nextDouble() * 0.003;
         Vec3 dir = new Vec3(
                 Math.cos(leanAngle) * leanStrength,
                 1.0,
@@ -89,13 +89,12 @@ public final class SpruceGenerator {
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
-            // Smooth taper: thick base narrowing to a tight leader at the top
-            float radius = Mth.lerp(t, def.maxTrunkWidth() * 0.55f, 0.52f);
+            // Thin single-block column — no trunkWidth scaling, just a slight taper
+            float radius = Mth.lerp(t, 0.60f, 0.44f);
             nodes.add(new Node(pos, dir, radius));
 
-            // Near-zero random walk — spruce is rigid
-            accX = accX * 0.86 + (rand.nextDouble() - 0.5) * 0.010;
-            accZ = accZ * 0.86 + (rand.nextDouble() - 0.5) * 0.010;
+            accX = accX * 0.86 + (rand.nextDouble() - 0.5) * 0.008;
+            accZ = accZ * 0.86 + (rand.nextDouble() - 0.5) * 0.008;
             dir = dir.add(accX, 0, accZ).add(0, 0.20, 0).normalize();
             pos = pos.add(dir.scale(step));
         }
@@ -110,11 +109,9 @@ public final class SpruceGenerator {
                                     List<List<Node>> allBranches, List<Whorl> whorls) {
         int trunkSize = trunk.size();
 
-        // Branches emerge from 15% to 90% of trunk — lower trunk bare for visual grounding
         float whorlStart = 0.15f;
         float whorlEnd   = 0.90f;
 
-        // More whorls = denser, more layered appearance
         int whorlCount = 9 + (int)(def.branchDensity() * 7);
 
         for (int w = 0; w < whorlCount; w++) {
@@ -122,19 +119,16 @@ public final class SpruceGenerator {
             int spawnIdx = Math.min(trunkSize - 2, (int)(tSpawn * trunkSize));
             Node spawnNode = trunk.get(spawnIdx);
 
-            // whorlT=0 at the bottom whorl, whorlT=1 at the top whorl
             float whorlT = (float) w / (whorlCount - 1);
 
-            // Branch count per whorl: 5-6 at base, 3-4 at top — gives denser lower silhouette
             int branchesInWhorl = Math.max(3, 6 - (int)(whorlT * 2.5f) + rand.nextInt(2));
 
-            // Branch length: long at base, short at top — this is the key to the triangular profile
-            float lengthScale = 1.0f - whorlT * 0.74f; // 1.0 at bottom whorl, 0.26 at top
+            // Branch length shrinks top→bottom to create the triangular profile
+            float lengthScale = 1.0f - whorlT * 0.74f;
             int baseBranchLen = def.minBranchLength()
                     + rand.nextInt(Math.max(1, def.maxBranchLength() - def.minBranchLength()));
             int branchSteps = Math.max(3, (int)(baseBranchLen * lengthScale));
 
-            // Golden-angle rotation per whorl so no two whorls align — looks natural
             double whorlAngleOffset = w * 2.3999 + (rand.nextDouble() - 0.5) * 0.15;
 
             double maxReach = 0;
@@ -142,20 +136,19 @@ public final class SpruceGenerator {
                 double angle = whorlAngleOffset + (2 * Math.PI * b / branchesInWhorl);
                 angle += (rand.nextDouble() - 0.5) * 0.28;
 
-                // Lower branches angle downward; upper branches nearly level; creates droop under snow load
-                double elevDeg = -6.0 - (1.0f - whorlT) * 10.0 + rand.nextDouble() * 5.0;
+                double elevDeg = -5.0 - (1.0f - whorlT) * 12.0 + rand.nextDouble() * 5.0;
                 double elevRad = Math.toRadians(elevDeg);
 
                 Vec3 outDir  = new Vec3(Math.cos(angle), 0, Math.sin(angle));
                 Vec3 initDir = outDir.scale(Math.cos(Math.abs(elevRad)))
                         .add(0, Math.sin(elevRad), 0).normalize();
 
-                float branchRadius = Math.max(0.22f, spawnNode.radius() * (0.22f + rand.nextFloat() * 0.14f));
+                // Fixed thin radius — branches are sticks, foliage provides the volume
+                float branchRadius = 0.18f + rand.nextFloat() * 0.06f;
 
                 List<Node> branch = growBranch(spawnNode.pos(), initDir, branchSteps, branchRadius, rand);
                 if (!branch.isEmpty()) {
                     allBranches.add(branch);
-                    // Track horizontal reach of this branch for foliage disc sizing
                     Node tip = branch.get(branch.size() - 1);
                     double dx = tip.pos().x - spawnNode.pos().x;
                     double dz = tip.pos().z - spawnNode.pos().z;
@@ -163,15 +156,15 @@ public final class SpruceGenerator {
                 }
             }
 
-            // Record whorl for layered foliage painting
-            if (maxReach > 1.5) {
-                whorls.add(new Whorl(spawnNode.pos().y, maxReach, spawnNode.pos()));
+            if (maxReach > 1.0) {
+                // Add padding beyond branch tips so foliage fully encloses the branch wood
+                whorls.add(new Whorl(spawnNode.pos().y, maxReach + 1.2, spawnNode.pos()));
             }
         }
     }
 
     // -----------------------------------------------------------------------
-    // Branch growth — slight downward sag, orderly not chaotic
+    // Branch growth — thin sticks, slight sag
     // -----------------------------------------------------------------------
 
     private List<Node> growBranch(Vec3 startPos, Vec3 startDir, int steps,
@@ -183,13 +176,12 @@ public final class SpruceGenerator {
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
-            float radius = Math.max(0.16f, startRadius * (1.0f - t * 0.78f));
+            float radius = Math.max(0.14f, startRadius * (1.0f - t * 0.70f));
             nodes.add(new Node(pos, dir, radius));
 
-            // Gradual sag under foliage weight — increases toward branch tip
-            double sag = -0.006 - t * 0.018;
-            accX = accX * 0.84 + (rand.nextDouble() - 0.5) * 0.038;
-            accZ = accZ * 0.84 + (rand.nextDouble() - 0.5) * 0.038;
+            double sag = -0.005 - t * 0.016;
+            accX = accX * 0.84 + (rand.nextDouble() - 0.5) * 0.036;
+            accZ = accZ * 0.84 + (rand.nextDouble() - 0.5) * 0.036;
             dir = dir.add(accX, sag, accZ).normalize();
             pos = pos.add(dir.scale(0.82));
         }
@@ -197,44 +189,49 @@ public final class SpruceGenerator {
     }
 
     // -----------------------------------------------------------------------
-    // Foliage — flat horizontal discs per whorl, preserving branch silhouette
+    // Foliage — dense 4-layer horizontal discs, full coverage per whorl tier
     // -----------------------------------------------------------------------
 
     /**
-     * Paints foliage as thin horizontal slabs at each whorl elevation.
-     * Radius of each disc matches the branch reach at that tier — the conical
-     * silhouette emerges purely from the shrinking disc radii, not from leaf blobs.
+     * Paints each whorl as a 4-layer-thick horizontal disc.
+     * - Bottom layer (dy=-1): slight underside fringe, 80% radius
+     * - Core layers (dy=0,1): full reach, maximum density — this is the main shelf
+     * - Top layer (dy=2): tapered cap, 70% radius, slightly sparser
+     * No inner clearance: foliage wraps trunk completely, trunk wood overwrites afterward.
      */
     private void paintWhorlFoliage(LevelAccessor level, List<Whorl> whorls,
                                     TreeDefinition def, RandomSource rand) {
-        float density = Mth.clamp(def.leafDensity(), 0.62f, 0.84f);
+        float baseDensity = Mth.clamp(def.leafDensity(), 0.70f, 0.88f);
 
-        for (int wi = 0; wi < whorls.size(); wi++) {
-            Whorl whorl = whorls.get(wi);
+        // Layer profile: {y-offset, radius-scale, density-scale}
+        double[][] layers = {
+            {-1, 0.72, 0.65},  // underside fringe
+            { 0, 1.00, 1.00},  // main shelf level
+            { 1, 0.92, 0.95},  // just above branch
+            { 2, 0.62, 0.72},  // tapering top cap
+        };
+
+        for (Whorl whorl : whorls) {
             double cx = whorl.trunkPos().x;
             double cz = whorl.trunkPos().z;
             double reach = whorl.reach();
+            int baseY = (int) Math.round(whorl.centerY());
 
-            // Foliage disc: 2 layers thick vertically, full reach horizontally
-            // Upper layer slightly smaller for a beveled edge rather than a flat shelf
-            for (int dy = 0; dy <= 1; dy++) {
-                double layerRadius = dy == 0 ? reach : reach * 0.72;
+            for (double[] layer : layers) {
+                int y = baseY + (int) layer[0];
+                double layerRadius = reach * layer[1];
+                float layerDensity = (float)(baseDensity * layer[2]);
                 int r = (int) Math.ceil(layerRadius);
-                int y = (int) Math.round(whorl.centerY()) + dy;
 
                 for (int dx = -r; dx <= r; dx++) {
                     for (int dz = -r; dz <= r; dz++) {
                         double dist = Math.sqrt(dx * dx + dz * dz);
                         if (dist > layerRadius) continue;
 
-                        // Skip the inner trunk zone — branch wood already fills that space
-                        double innerClear = 0.8;
-                        if (dist < innerClear) continue;
-
-                        // Soft density falloff toward the disc edge for a natural fringe
-                        double edgeFade = 1.0 - Math.max(0, dist - layerRadius * 0.65) / (layerRadius * 0.35 + 0.01);
-                        // Slight density randomness within the disc for texture
-                        float placeDensity = (float)(density * edgeFade * (0.80 + rand.nextDouble() * 0.20));
+                        // Soft edge fade: full density in inner 70%, fades to 0 at edge
+                        double edgeFade = 1.0 - Math.max(0, dist - layerRadius * 0.70)
+                                / (layerRadius * 0.30 + 0.01);
+                        float placeDensity = (float)(layerDensity * edgeFade);
 
                         if (rand.nextFloat() < placeDensity) {
                             BlockPos p = BlockPos.containing(cx + dx, y, cz + dz);
@@ -249,7 +246,7 @@ public final class SpruceGenerator {
     }
 
     // -----------------------------------------------------------------------
-    // Apex — narrow elongated terminal spike, the iconic spruce crown tip
+    // Apex — narrow elongated terminal spike, the iconic spruce crown
     // -----------------------------------------------------------------------
 
     private void paintApex(LevelAccessor level, List<Node> trunk, RandomSource rand) {
@@ -259,16 +256,16 @@ public final class SpruceGenerator {
         double cy = tip.pos().y;
         double cz = tip.pos().z;
 
-        // Paint a narrow elongated spike: radius widens slightly a few blocks below the tip
-        // then tightens back to a single point — the classic spruce leader
-        int[] radii = {1, 1, 2, 2, 1, 1, 0}; // from tip downward
+        // Radius pattern from tip downward — widens then tapers, classic leader shape
+        int[] radii = {0, 1, 1, 2, 2, 2, 1, 1};
+        float[] densities = {1.0f, 0.92f, 0.90f, 0.85f, 0.82f, 0.78f, 0.72f, 0.65f};
+
         for (int i = 0; i < radii.length; i++) {
             int r = radii[i];
             int y = (int) Math.round(cy) - i;
-            float apexDensity = 0.88f - i * 0.06f;
+            float apexDensity = densities[i];
 
             if (r == 0) {
-                // Single tip block
                 BlockPos p = BlockPos.containing(cx, y, cz);
                 if (level.getBlockState(p).isAir()) {
                     level.setBlock(p, leaves, 3);
@@ -278,8 +275,7 @@ public final class SpruceGenerator {
 
             for (int dx = -r; dx <= r; dx++) {
                 for (int dz = -r; dz <= r; dz++) {
-                    double dist = Math.sqrt(dx * dx + dz * dz);
-                    if (dist <= r && rand.nextFloat() < apexDensity) {
+                    if (Math.sqrt(dx * dx + dz * dz) <= r && rand.nextFloat() < apexDensity) {
                         BlockPos p = BlockPos.containing(cx + dx, y, cz + dz);
                         if (level.getBlockState(p).isAir()) {
                             level.setBlock(p, leaves, 3);
@@ -302,11 +298,8 @@ public final class SpruceGenerator {
 
     private void paintBranch(LevelAccessor level, List<Node> branch) {
         for (Node n : branch) {
-            if (n.radius() >= 0.28f) {
-                paintSphere(level, n.pos(), n.radius(), wood);
-            } else {
-                setIfAirOrWood(level, BlockPos.containing(n.pos()), wood);
-            }
+            // Branches are thin sticks — single-block path, no fat spheres
+            setIfAirOrWood(level, BlockPos.containing(n.pos()), wood);
         }
     }
 
