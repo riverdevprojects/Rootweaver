@@ -19,11 +19,11 @@ import java.util.List;
  *
  * Design contract:
  *  - Massive columnar trunk: 40-80+ blocks, very slow taper, heavy base flare
- *  - Branches concentrated in the upper 25-35% of the tree — lower trunk remains bare
- *  - Thick primary scaffolds emerge outward first, then rise or gently droop under foliage
- *  - 3-level hierarchy (primary → secondary → tertiary), layered and supportive
- *  - Dense cohesive crown core with irregular overlapping edge foliage
- *  - Broad ancient redwood crown — heavy, connected, and visible as one silhouette
+ *  - Branches ONLY from upper 45-92% of trunk — lower half completely bare
+ *  - Nearly horizontal emergence (5-25°) angling gently upward as they extend
+ *  - 3-level hierarchy (primary → secondary → tertiary), disciplined not chaotic
+ *  - Occasional dead lower limbs for ancient character
+ *  - Narrow layered canopy — taller-than-wide clusters, sky-visible between sections
  *  - Broad stabilizing roots, heavy and ancient
  */
 public final class RedwoodGenerator {
@@ -175,54 +175,36 @@ public final class RedwoodGenerator {
 
     private void growAllBranches(List<Node> trunk, TreeDefinition def, RandomSource rand,
                                   List<List<Node>> allBranches, List<Vec3> leafAnchors) {
-        int trunkSize = trunk.size();
-        int primaryCount = 10 + rand.nextInt(4 + Math.max(1, (int)(def.branchDensity() * 6)));
-
-        // Fill the crown interior first so the top reads as one old-growth mass, not
-        // separated leaf puffs at branch tips.  Anchors sit inside the upper 25-35%
-        // of the already-generated trunk; the trunk geometry itself is untouched.
-        for (int i = 0; i < 9; i++) {
-            float t = 0.68f + i * 0.035f + (rand.nextFloat() - 0.5f) * 0.012f;
-            int idx = Mth.clamp((int)(t * trunkSize), 0, trunkSize - 1);
-            Node crownNode = trunk.get(idx);
-            double ring = (i % 3) * (Math.PI * 2.0 / 3.0) + rand.nextDouble() * 0.45;
-            double spread = 0.6 + (i % 4) * 0.35;
-            leafAnchors.add(crownNode.pos().add(
-                    Math.cos(ring) * spread,
-                    0.2 + rand.nextDouble() * 0.8,
-                    Math.sin(ring) * spread));
-        }
+        int trunkSize    = trunk.size();
+        int primaryCount = 4 + rand.nextInt(Math.max(1, (int)(def.branchDensity() * 4)));
 
         for (int b = 0; b < primaryCount; b++) {
             double angle = (2 * Math.PI * b / primaryCount)
-                    + (rand.nextDouble() - 0.5) * (Math.PI / primaryCount * 0.85);
+                    + (rand.nextDouble() - 0.5) * (Math.PI / primaryCount);
 
-            // Crown scaffolds live in the top third: broad lower skirt, shorter
-            // upper branches, and a slightly irregular outline for realism.
-            float layer = (b % 5) / 4.0f;
-            float bandBase = 0.66f + (layer * 0.30f);
-            float tSpawn = Mth.clamp(bandBase + (rand.nextFloat() - 0.5f) * 0.075f, 0.64f, 0.98f);
+            // Branches only from upper 45-92% — lower trunk bare, creating the monumental column
+            float tSpawn = 0.45f + rand.nextFloat() * 0.47f;
             int spawnIdx = Math.min(trunkSize - 2, (int)(tSpawn * trunkSize));
-            Node spawn = trunk.get(spawnIdx);
+            Node spawn   = trunk.get(spawnIdx);
 
-            boolean upperCrown = tSpawn > 0.86f;
-            int baseSteps = def.minBranchLength() + 3
-                    + rand.nextInt(Math.max(1, def.maxBranchLength() - def.minBranchLength() + 3));
-            int primarySteps = upperCrown
-                    ? Math.max(5, (int)(baseSteps * (0.58f + rand.nextFloat() * 0.18f)))
-                    : baseSteps + rand.nextInt(4);
+            // Dead limb in 45-62% zone — short, bare, adds ancient aged character
+            boolean isDead = tSpawn < 0.62f && rand.nextFloat() < 0.40f;
 
-            // Outward first with only a small vertical component; branch curvature
-            // later gives the redwood its weighty upward/drooping layered crown.
-            double elevAngle = Math.toRadians(-4.0 + rand.nextDouble() * 16.0);
-            Vec3 outDir = new Vec3(Math.cos(angle), 0, Math.sin(angle));
+            int primarySteps = isDead
+                    ? 4 + rand.nextInt(5)
+                    : def.minBranchLength() + 2 + rand.nextInt(Math.max(1, def.maxBranchLength() - def.minBranchLength()));
+
+            // Nearly horizontal: 5-25° elevation (oak uses 17-40°)
+            // Branches start level then arc upward gently as they extend
+            double elevAngle = Math.toRadians(5.0 + rand.nextDouble() * 20.0);
+            Vec3 outDir  = new Vec3(Math.cos(angle), 0, Math.sin(angle));
             Vec3 initDir = outDir.scale(Math.cos(elevAngle))
                     .add(0, Math.sin(elevAngle), 0).normalize();
 
-            float primaryRadius = Math.max(0.85f, spawn.radius() * (0.38f + rand.nextFloat() * 0.16f));
+            float primaryRadius = Math.max(0.55f, spawn.radius() * (0.32f + rand.nextFloat() * 0.14f));
 
             List<Node> primary = growPrimary(spawn.pos(), initDir, primarySteps, primaryRadius,
-                    def, rand, allBranches, leafAnchors, false);
+                    def, rand, allBranches, leafAnchors, isDead);
 
             if (!primary.isEmpty()) allBranches.add(primary);
         }
@@ -241,9 +223,9 @@ public final class RedwoodGenerator {
         Vec3 dir = startDir;
         double accX = 0, accZ = 0;
 
-        int secCount = isDead ? 0 : (3 + rand.nextInt(3));
+        int secCount = isDead ? 0 : (1 + rand.nextInt(3));
         int[] secPositions = secCount > 0
-                ? pickAttachPoints(steps, secCount, 0.22f, 0.90f, rand)
+                ? pickAttachPoints(steps, secCount, 0.30f, 0.80f, rand)
                 : new int[0];
 
         for (int i = 0; i < steps; i++) {
@@ -261,15 +243,10 @@ public final class RedwoodGenerator {
             accX = accX * 0.80 + (rand.nextDouble() - 0.5) * 0.07;
             accZ = accZ * 0.80 + (rand.nextDouble() - 0.5) * 0.07;
 
-            if (!isDead && i > 1 && (i % 2 == 0 || t > 0.70f)) {
-                leafAnchors.add(pos);
-            }
-
-            // Heavy redwood scaffolds push outward first; lower crown limbs sag a
-            // touch under dense foliage, while outer tips gently recover upward.
-            double upCurve = t < 0.38f ? -0.010 + rand.nextDouble() * 0.010 : 0.008 + t * 0.022;
+            // Gentle upward arc — branches angle toward light as they extend, no sag
+            double upCurve = 0.025 + t * 0.035;
             dir = dir.add(accX, upCurve, accZ).normalize();
-            pos = pos.add(dir.scale(0.88));
+            pos = pos.add(dir.scale(0.85));
         }
 
         if (!isDead && !nodes.isEmpty()) {
@@ -285,14 +262,14 @@ public final class RedwoodGenerator {
 
     private void growSecondary(Vec3 startPos, Vec3 parentDir, float startRadius,
                                 RandomSource rand, List<List<Node>> allBranches, List<Vec3> leafAnchors) {
-        int steps = 5 + rand.nextInt(5);
-        Vec3 dir  = divergeDir(parentDir, 0.48, 0.44, 0.24, rand);
+        int steps = 4 + rand.nextInt(5);
+        Vec3 dir  = divergeDir(parentDir, 0.32, 0.48, 0.50, rand);
         List<Node> nodes = new ArrayList<>();
         Vec3 pos = startPos;
         double accX = 0, accZ = 0;
 
-        int tertiaryCount = 2 + rand.nextInt(3);
-        int[] tertiaryPositions = pickAttachPoints(steps, tertiaryCount, 0.24f, 0.86f, rand);
+        int tertiaryCount = 1 + rand.nextInt(2);
+        int[] tertiaryPositions = pickAttachPoints(steps, tertiaryCount, 0.30f, 0.80f, rand);
 
         for (int i = 0; i < steps; i++) {
             float t = i / (float) Math.max(1, steps - 1);
@@ -308,12 +285,8 @@ public final class RedwoodGenerator {
 
             accX = accX * 0.78 + (rand.nextDouble() - 0.5) * 0.09;
             accZ = accZ * 0.78 + (rand.nextDouble() - 0.5) * 0.09;
-            if (i > 0 && (i % 2 == 0 || t > 0.60f)) {
-                leafAnchors.add(pos);
-            }
-
-            dir = dir.add(accX, 0.012 + rand.nextDouble() * 0.030, accZ).normalize();
-            pos = pos.add(dir.scale(0.80));
+            dir = dir.add(accX, 0.04 + rand.nextDouble() * 0.03, accZ).normalize();
+            pos = pos.add(dir.scale(0.78));
         }
 
         if (!nodes.isEmpty()) {
@@ -329,7 +302,7 @@ public final class RedwoodGenerator {
     private void growTertiary(Vec3 startPos, Vec3 parentDir, float startRadius,
                                RandomSource rand, List<List<Node>> allBranches, List<Vec3> leafAnchors) {
         int steps = 3 + rand.nextInt(4);
-        Vec3 dir  = divergeDir(parentDir, 0.46, 0.40, 0.22, rand);
+        Vec3 dir  = divergeDir(parentDir, 0.38, 0.42, 0.55, rand);
         List<Node> nodes = new ArrayList<>();
         Vec3 pos = startPos;
 
@@ -338,16 +311,12 @@ public final class RedwoodGenerator {
             float radius = Math.max(0.15f, startRadius * (1.0f - t * 0.68f));
             nodes.add(new Node(pos, dir, radius));
 
-            if (i > 0) {
-                leafAnchors.add(pos);
-            }
-
             Vec3 jitter = new Vec3(
                     (rand.nextDouble() - 0.5) * 0.14,
-                    0.015 + rand.nextDouble() * 0.035,
+                    0.06 + rand.nextDouble() * 0.05,
                     (rand.nextDouble() - 0.5) * 0.14);
             dir = dir.add(jitter).normalize();
-            pos = pos.add(dir.scale(0.66));
+            pos = pos.add(dir.scale(0.65));
         }
 
         if (!nodes.isEmpty()) {
@@ -390,46 +359,43 @@ public final class RedwoodGenerator {
     }
 
     /**
-     * Dense old-growth redwood crown.  Leaf anchors are intentionally collected
-     * along the branch network and inside the crown core so foliage overlaps into
-     * one connected canopy instead of appearing only as clipped tufts at branch tips.
+     * Layered canopy masses — tall-and-narrow clusters, open sky between sections.
+     * Clusters are vertically elongated and biased upward to form distinct crown layers
+     * rather than a solid spherical blob.
      */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors,
                                     TreeDefinition def, RandomSource rand) {
-        float density = Mth.clamp(def.leafDensity() + 0.16f, 0.72f, 0.94f);
-        float branchScale = def.maxBranchLength() / 14.0f;
+        float density = Mth.clamp(def.leafDensity(), 0.48f, 0.78f);
+        float branchScale = def.maxBranchLength() / 18.0f;
 
         for (Vec3 anchor : anchors) {
-            // Broad overlapping clusters create the dense inner canopy core and fill
-            // gaps between support limbs.  Slightly taller Y radii preserve the
-            // layered conical/domed redwood crown instead of making a flat cap.
-            int rx = 2 + rand.nextInt(2 + Math.max(1, (int)(branchScale * 2)));
-            int ry = rx + rand.nextInt(3);
-            int rz = 2 + rand.nextInt(2 + Math.max(1, (int)(branchScale * 2)));
+            // Primary cluster: taller than wide — narrow evergreen silhouette
+            int rx = 1 + rand.nextInt(1 + (int)(branchScale * 2));
+            int ry = rx + 1 + rand.nextInt(2);
+            int rz = 1 + rand.nextInt(1 + (int)(branchScale * 2));
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
 
-            // Softer irregular outer lobes blur the edge while staying attached to
-            // the primary mass.  These are deliberately offset only a little so no
-            // isolated bonsai-like tip clumps remain.
-            if (rand.nextFloat() < 0.78f) {
-                double lobeRange = 1.1 + def.maxBranchLength() * 0.045;
+            // Secondary lobe: offset upward for layered crown feel
+            if (rand.nextFloat() < 0.60f) {
+                double lobeRange = 1.2 + def.maxBranchLength() * 0.055;
                 Vec3 offset = new Vec3(
                         (rand.nextDouble() - 0.5) * lobeRange,
-                        (rand.nextDouble() - 0.15) * lobeRange * 0.45,
+                        rand.nextDouble() * lobeRange * 0.5,
                         (rand.nextDouble() - 0.5) * lobeRange);
-                int r2 = 1 + rand.nextInt(2 + Math.max(1, (int)branchScale));
-                paintEllipsoid(level, anchor.add(offset), r2 + 1, r2 + 1 + rand.nextInt(2),
-                        r2 + 1, rand, density * 0.76f);
+                int r2  = 1 + rand.nextInt(1 + (int)(branchScale * 2));
+                int r2y = r2 + rand.nextInt(2);
+                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.65f);
             }
 
-            if (rand.nextFloat() < 0.35f) {
-                double terRange = 1.4 + def.maxBranchLength() * 0.055;
+            // Occasional third lobe — breaks up any remaining regularity
+            if (rand.nextFloat() < 0.25f) {
+                double terRange = 1.5 + def.maxBranchLength() * 0.07;
                 Vec3 offset2 = new Vec3(
                         (rand.nextDouble() - 0.5) * terRange,
-                        (rand.nextDouble() - 0.35) * terRange * 0.35,
+                        rand.nextDouble() * terRange * 0.4,
                         (rand.nextDouble() - 0.5) * terRange);
                 int r3 = 1 + rand.nextInt(2);
-                paintEllipsoid(level, anchor.add(offset2), r3 + 1, r3 + 1, r3 + 1, rand, density * 0.58f);
+                paintEllipsoid(level, anchor.add(offset2), r3, r3 + 1, r3, rand, density * 0.45f);
             }
         }
     }
