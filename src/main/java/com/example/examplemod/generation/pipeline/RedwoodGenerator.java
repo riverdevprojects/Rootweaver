@@ -283,6 +283,11 @@ public final class RedwoodGenerator {
                 }
             }
 
+            // Add leaf anchors along the secondary branch, not just at the tip
+            if (i > 0 && i % 2 == 0) {
+                leafAnchors.add(pos);
+            }
+
             accX = accX * 0.78 + (rand.nextDouble() - 0.5) * 0.09;
             accZ = accZ * 0.78 + (rand.nextDouble() - 0.5) * 0.09;
             dir = dir.add(accX, 0.04 + rand.nextDouble() * 0.03, accZ).normalize();
@@ -310,6 +315,9 @@ public final class RedwoodGenerator {
             float t = i / (float) Math.max(1, steps - 1);
             float radius = Math.max(0.15f, startRadius * (1.0f - t * 0.68f));
             nodes.add(new Node(pos, dir, radius));
+
+            // Every step of tertiary is a leaf source — dense foliage spray along full length
+            leafAnchors.add(pos);
 
             Vec3 jitter = new Vec3(
                     (rand.nextDouble() - 0.5) * 0.14,
@@ -359,43 +367,28 @@ public final class RedwoodGenerator {
     }
 
     /**
-     * Layered canopy masses — tall-and-narrow clusters, open sky between sections.
-     * Clusters are vertically elongated and biased upward to form distinct crown layers
-     * rather than a solid spherical blob.
+     * Redwood foliage — dense flat horizontal sprays along branch length.
+     * Individual clusters are wide and flat (wider-than-tall) to mimic the
+     * feathery, horizontal spray habit of coast redwood foliage.
+     * Overall silhouette stays narrow because anchors are concentrated along
+     * near-horizontal upper branches, not scattered spherically.
      */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors,
                                     TreeDefinition def, RandomSource rand) {
-        float density = Mth.clamp(def.leafDensity(), 0.48f, 0.78f);
-        float branchScale = def.maxBranchLength() / 18.0f;
+        float density = Mth.clamp(def.leafDensity(), 0.55f, 0.82f);
 
         for (Vec3 anchor : anchors) {
-            // Primary cluster: taller than wide — narrow evergreen silhouette
-            int rx = 1 + rand.nextInt(1 + (int)(branchScale * 2));
-            int ry = rx + 1 + rand.nextInt(2);
-            int rz = 1 + rand.nextInt(1 + (int)(branchScale * 2));
+            // Flat horizontal spray: wide in X/Z, compressed in Y
+            int rx = 3 + rand.nextInt(3); // 3-5 wide
+            int ry = 1 + rand.nextInt(2); // 1-2 tall — flat disc
+            int rz = 3 + rand.nextInt(3);
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
 
-            // Secondary lobe: offset upward for layered crown feel
-            if (rand.nextFloat() < 0.60f) {
-                double lobeRange = 1.2 + def.maxBranchLength() * 0.055;
-                Vec3 offset = new Vec3(
-                        (rand.nextDouble() - 0.5) * lobeRange,
-                        rand.nextDouble() * lobeRange * 0.5,
-                        (rand.nextDouble() - 0.5) * lobeRange);
-                int r2  = 1 + rand.nextInt(1 + (int)(branchScale * 2));
-                int r2y = r2 + rand.nextInt(2);
-                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.65f);
-            }
-
-            // Occasional third lobe — breaks up any remaining regularity
-            if (rand.nextFloat() < 0.25f) {
-                double terRange = 1.5 + def.maxBranchLength() * 0.07;
-                Vec3 offset2 = new Vec3(
-                        (rand.nextDouble() - 0.5) * terRange,
-                        rand.nextDouble() * terRange * 0.4,
-                        (rand.nextDouble() - 0.5) * terRange);
-                int r3 = 1 + rand.nextInt(2);
-                paintEllipsoid(level, anchor.add(offset2), r3, r3 + 1, r3, rand, density * 0.45f);
+            // Small secondary puff just above — adds slight vertical volume without going oak-round
+            if (rand.nextFloat() < 0.45f) {
+                Vec3 up = anchor.add(0, 1 + rand.nextInt(2), 0);
+                int r2 = 2 + rand.nextInt(2);
+                paintEllipsoid(level, up, r2, 1, r2, rand, density * 0.55f);
             }
         }
     }
