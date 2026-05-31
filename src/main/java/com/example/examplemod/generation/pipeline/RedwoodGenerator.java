@@ -67,6 +67,9 @@ public final class RedwoodGenerator {
             }
         }
 
+        // Main canopy: solid conical leaf mass from canopy base to trunk top
+        paintConicalCanopy(level, trunk, def, rand);
+        // Accent puffs at branch tips for detail beyond the cone edge
         placeLeafClusters(level, leafAnchors, def, rand);
         return true;
     }
@@ -375,22 +378,61 @@ public final class RedwoodGenerator {
     }
 
     /**
-     * Redwood foliage — small oval clusters distributed along the full branch
-     * hierarchy. Kept small so individual clusters don't merge into an oak blob;
-     * the density comes from having many anchors, not from large cluster radii.
-     * Slightly taller-than-wide to hint at the narrow spire silhouette.
+     * Conical leaf mass — the primary canopy volume.
+     * Paints a linearly tapered cone from canopyStart (45% of trunk) to trunk top.
+     * Radius at the base is wide (filling out to branch tips); tapers to a small
+     * cap at the crown. Per-layer radius gets slight noise so the silhouette is
+     * ragged and natural rather than a perfect triangle.
      */
+    private void paintConicalCanopy(LevelAccessor level, List<Node> trunk,
+                                     TreeDefinition def, RandomSource rand) {
+        int trunkSize = trunk.size();
+        int canopyStartIdx = (int)(0.45f * trunkSize);
+        Node canopyBottom = trunk.get(canopyStartIdx);
+        Node canopyTop    = trunk.get(trunkSize - 1);
+
+        double bottomY = canopyBottom.pos().y;
+        double topY    = canopyTop.pos().y;
+        // Trunk lean means the cone center drifts — follow trunk midline
+        double cx = (canopyBottom.pos().x + canopyTop.pos().x) * 0.5;
+        double cz = (canopyBottom.pos().z + canopyTop.pos().z) * 0.5;
+
+        // Widest radius at canopy base — scaled to branch length so bigger trees fill out more
+        double maxRadius = 6.0 + def.maxBranchLength() * 0.55;
+        float density = Mth.clamp(def.leafDensity(), 0.68f, 0.88f);
+
+        for (int y = (int)bottomY; y <= (int)topY + 1; y++) {
+            double t = (y - bottomY) / Math.max(1, topY - bottomY); // 0=base, 1=tip
+            // Linear taper + per-layer noise for ragged silhouette
+            double radius = maxRadius * (1.0 - t) + (rand.nextDouble() - 0.3) * 2.5;
+            radius = Math.max(1.0, radius);
+            int r = (int)Math.ceil(radius);
+
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    double dist = Math.sqrt(dx * dx + dz * dz);
+                    // Soft edge: full density in core, fading at the fringe
+                    float edgeFactor = (float)(1.0 - Math.max(0, dist - radius * 0.7) / (radius * 0.3 + 0.01));
+                    if (dist <= radius && rand.nextFloat() < density * edgeFactor) {
+                        BlockPos p = BlockPos.containing(cx + dx, y, cz + dz);
+                        if (level.getBlockState(p).isAir()) {
+                            level.setBlock(p, leaves, 3);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Small accent puffs at branch tips — adds detail and depth beyond the cone edge. */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors,
                                     TreeDefinition def, RandomSource rand) {
-        // Lower per-cluster density — fullness comes from anchor count, not blob size
-        float density = Mth.clamp(def.leafDensity() * 0.75f, 0.40f, 0.62f);
-
+        float density = Mth.clamp(def.leafDensity() * 0.7f, 0.45f, 0.65f);
         for (Vec3 anchor : anchors) {
-            // Small oval: 2 wide, 2-3 tall — redwood foliage in compact upright tufts
-            int rx = 1 + rand.nextInt(2); // 1-2
-            int ry = rx + rand.nextInt(2); // rx to rx+1
-            int rz = 1 + rand.nextInt(2);
-            paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
+            // Only tip anchors (not the mid-branch ones) get puffs — filter by sampling ~30%
+            if (rand.nextFloat() > 0.30f) continue;
+            int r = 1 + rand.nextInt(2);
+            paintEllipsoid(level, anchor, r, r + rand.nextInt(2), r, rand, density);
         }
     }
 
