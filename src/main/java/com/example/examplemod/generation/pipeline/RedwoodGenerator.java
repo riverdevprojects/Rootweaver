@@ -233,6 +233,13 @@ public final class RedwoodGenerator {
             float radius = Math.max(isDead ? 0.30f : 0.50f, startRadius * (1.0f - t * 0.62f));
             nodes.add(new Node(pos, dir, radius));
 
+            // Live redwood branches carry foliage in flat pads along the branch,
+            // not only as one large tuft at the tip. Interior anchors add crown
+            // volume while preserving the original trunk/branch height.
+            if (!isDead && (i == Math.max(1, steps / 2) || i == Math.max(1, (steps * 3) / 4))) {
+                leafAnchors.add(pos);
+            }
+
             for (int sp : secPositions) {
                 if (sp == i) {
                     float secRadius = Math.max(0.35f, radius * (0.50f + rand.nextFloat() * 0.15f));
@@ -275,6 +282,12 @@ public final class RedwoodGenerator {
             float t = i / (float) Math.max(1, steps - 1);
             float radius = Math.max(0.28f, startRadius * (1.0f - t * 0.60f));
             nodes.add(new Node(pos, dir, radius));
+
+            // Add a modest pad in the middle of secondary limbs so the crown forms
+            // layered shelves instead of isolated balls at the tips.
+            if (i == Math.max(1, steps / 2)) {
+                leafAnchors.add(pos);
+            }
 
             for (int sp : tertiaryPositions) {
                 if (sp == i) {
@@ -359,43 +372,42 @@ public final class RedwoodGenerator {
     }
 
     /**
-     * Layered canopy masses — tall-and-narrow clusters, open sky between sections.
-     * Clusters are vertically elongated and biased upward to form distinct crown layers
-     * rather than a solid spherical blob.
+     * Layered canopy masses — compact horizontal pads distributed along branches.
+     * The crown gets larger from having more small, overlapping pads, not from tall
+     * vertical blobs, so the redwood keeps the same overall height while gaining
+     * old-growth canopy mass.
      */
     private void placeLeafClusters(LevelAccessor level, List<Vec3> anchors,
                                     TreeDefinition def, RandomSource rand) {
-        float density = Mth.clamp(def.leafDensity(), 0.48f, 0.78f);
+        float density = Mth.clamp(def.leafDensity(), 0.50f, 0.80f);
         float branchScale = def.maxBranchLength() / 18.0f;
 
         for (Vec3 anchor : anchors) {
-            // Primary cluster: taller than wide — narrow evergreen silhouette
-            int rx = 1 + rand.nextInt(1 + (int)(branchScale * 2));
-            int ry = rx + 1 + rand.nextInt(2);
-            int rz = 1 + rand.nextInt(1 + (int)(branchScale * 2));
+            // Primary pad: broader than tall, matching redwood branch shelves.
+            int rx = 2 + rand.nextInt(1 + (int)(branchScale * 2));
+            int ry = 1 + rand.nextInt(2);
+            int rz = 2 + rand.nextInt(1 + (int)(branchScale * 2));
             paintEllipsoid(level, anchor, rx, ry, rz, rand, density);
 
-            // Secondary lobe: offset upward for layered crown feel
-            if (rand.nextFloat() < 0.60f) {
-                double lobeRange = 1.2 + def.maxBranchLength() * 0.055;
+            // Same-level side lobe: widens the branch pad without pushing the crown upward.
+            if (rand.nextFloat() < 0.55f) {
+                double lobeRange = 1.4 + def.maxBranchLength() * 0.055;
                 Vec3 offset = new Vec3(
                         (rand.nextDouble() - 0.5) * lobeRange,
-                        rand.nextDouble() * lobeRange * 0.5,
+                        (rand.nextDouble() - 0.5) * 0.6,
                         (rand.nextDouble() - 0.5) * lobeRange);
-                int r2  = 1 + rand.nextInt(1 + (int)(branchScale * 2));
-                int r2y = r2 + rand.nextInt(2);
-                paintEllipsoid(level, anchor.add(offset), r2, r2y, r2, rand, density * 0.65f);
+                int r2 = 1 + rand.nextInt(1 + (int)(branchScale * 2));
+                paintEllipsoid(level, anchor.add(offset), r2 + 1, 1 + rand.nextInt(2), r2 + 1, rand, density * 0.62f);
             }
 
-            // Occasional third lobe — breaks up any remaining regularity
-            if (rand.nextFloat() < 0.25f) {
-                double terRange = 1.5 + def.maxBranchLength() * 0.07;
-                Vec3 offset2 = new Vec3(
-                        (rand.nextDouble() - 0.5) * terRange,
-                        rand.nextDouble() * terRange * 0.4,
-                        (rand.nextDouble() - 0.5) * terRange);
-                int r3 = 1 + rand.nextInt(2);
-                paintEllipsoid(level, anchor.add(offset2), r3, r3 + 1, r3, rand, density * 0.45f);
+            // Small underside drape: adds layered depth under some pads while keeping
+            // the top of the canopy at the original height.
+            if (rand.nextFloat() < 0.35f) {
+                Vec3 drape = anchor.add(
+                        (rand.nextDouble() - 0.5) * 1.2,
+                        -(1 + rand.nextInt(2)),
+                        (rand.nextDouble() - 0.5) * 1.2);
+                paintEllipsoid(level, drape, 2, 2, 2, rand, density * 0.52f);
             }
         }
     }
