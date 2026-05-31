@@ -18,8 +18,8 @@ import java.util.List;
  * Compact rounded-canopy "common" oak — the workhorse tree of the forest floor.
  *
  * Shape: short trunk (3–4 blocks), oblate dome canopy (H-radius 3–5, V-radius 2–4,
- * so the dome is always wider than tall). Dense leaves with a rounded crown taper,
- * sagging edge skirt, and surface noise — reads as full and heavy, not a ball on a stick.
+ * so the dome is always wider than tall). Dense leaves, smooth rounded underside,
+ * crown taper, and surface noise — reads as a solid heavy dome, no drips or tendrils.
  *
  * Designed to cluster: no spacing or collision rejection is applied, so canopies
  * freely interpenetrate into a continuous forest roof.
@@ -131,100 +131,60 @@ public final class CommonOakGenerator {
     // -----------------------------------------------------------------------
 
     /**
-     * Oblate domed canopy — wider than tall, dense, with sagging sides.
+     * Oblate domed canopy — wider than tall, dense, clean rounded underside.
      *
-     * 1. Oblate shape — rx/rz >> ry, so the dome is always visibly wider than tall.
-     *    The bottom half uses a slightly compressed ry (×0.80) to push leaves
-     *    outward at the lower edge rather than curving smoothly under.
+     * Single-pass oblate ellipsoid. No edge extensions or skirts — the ellipsoid
+     * curve naturally rounds the bottom back toward the trunk, which is the
+     * correct silhouette (solid dome, not drippy/weeping).
      *
-     * 2. Surface noise — per-voxel position hash perturbs the shell radius by ±15 %,
-     *    producing a lumpy rather than perfectly smooth silhouette.
-     *
-     * 3. Crown taper — fill probability falls off linearly from the equator to the
-     *    apex, so the top rounds off instead of reading as a flat or squared cap.
-     *
-     * 4. Density gradient — interior fills at full density; the shell thins toward
-     *    the boundary for a soft, irregular outer feel with no internal air gaps.
-     *
-     * 5. Edge skirt — after the main ellipsoid, the outer horizontal ring of the
-     *    canopy has leaves extended 1 block (and occasionally 2, noise-driven)
-     *    straight downward, giving the sides a drooping/sagging silhouette.
+     * 1. Oblate shape: rx/rz >> ry, dome always wider than tall.
+     *    Both halves use the same ry so the underside curves symmetrically
+     *    back to center — smooth, not flared or dangling.
+     * 2. Surface noise: ±12 % shell perturbation for a lumpy-not-smooth edge.
+     * 3. Crown taper: fill probability drops toward the apex so the top
+     *    rounds off rather than reading as a flat cap.
+     * 4. Density gradient: interior fills at full density; outer shell thins
+     *    slightly for a soft edge with no significant internal air gaps.
      */
     private void paintCanopy(LevelAccessor level, Vec3 center, int rx, int ry,
                               RandomSource rand, float baseDensity) {
         int rz = rx; // symmetric on the horizontal plane
-        float density = Mth.clamp(baseDensity, 0.84f, 0.96f);
+        float density = Mth.clamp(baseDensity, 0.86f, 0.96f);
 
         int cx = (int) center.x;
         int cy = (int) center.y;
         int cz = (int) center.z;
 
-        // Pass 1 — oblate ellipsoid body with taper and noise
         for (int dx = -rx - 1; dx <= rx + 1; dx++) {
             for (int dy = -ry - 1; dy <= ry + 1; dy++) {
                 for (int dz = -rz - 1; dz <= rz + 1; dz++) {
                     double nx = dx / (double) rx;
-                    // Bottom droop: lower half uses a compressed ry so the dome
-                    // flares outward slightly instead of curving under cleanly
-                    double effectiveRy = dy < 0 ? ry * 0.80 : ry;
-                    double ny = dy / effectiveRy;
+                    double ny = dy / (double) ry; // same ry top and bottom — clean ellipsoid
                     double nz = dz / (double) rz;
                     double dist2 = nx * nx + ny * ny + nz * nz;
 
-                    // Per-voxel noise perturbs the effective shell boundary
+                    // Per-voxel noise for lumpy-but-not-stringy edge (±12 %)
                     long nh = hashPos(cx + dx, cy + dy, cz + dz);
                     double noise = (nh & 0xFFFFL) / (double) 0xFFFFL; // 0.0–1.0
-                    double shell = 1.0 + (noise - 0.5) * 0.30;        // 0.85–1.15
+                    double shell = 1.0 + (noise - 0.5) * 0.24;        // 0.88–1.12
 
                     if (dist2 <= shell * shell) {
                         BlockPos p = BlockPos.containing(center.x + dx, center.y + dy, center.z + dz);
 
-                        // Density gradient: interior dense, outer shell thinner
+                        // Dense interior, slightly thinned outer shell
                         float fill = dist2 < 0.50
                                 ? density
-                                : density * (float) (1.0 - (dist2 - 0.50) * 0.55);
+                                : density * (float) (1.0 - (dist2 - 0.50) * 0.45);
 
-                        // Crown taper: above the equator, linearly reduce fill toward apex
-                        // so the top rounds off rather than reading as a flat cap
+                        // Crown taper: thin toward apex so the top rounds off cleanly
                         if (dy > 0) {
-                            float topT = dy / (float) ry; // 0 at equator → 1 at apex
-                            fill *= 1.0f - topT * 0.65f;
+                            float topT = dy / (float) ry;
+                            fill *= 1.0f - topT * 0.60f;
                         }
 
                         if (rand.nextFloat() <= fill && level.getBlockState(p).isAir()) {
                             level.setBlock(p, LEAVES, 3);
                         }
-                    }
-                }
-            }
-        }
-
-        // Pass 2 — edge skirt: at the outer horizontal ring of the canopy, drop
-        // leaves 1 block downward (occasionally 2, noise-driven) so the sides
-        // sag visibly rather than cutting off as a vertical wall.
-        for (int dx = -(rx + 1); dx <= rx + 1; dx++) {
-            for (int dz = -(rz + 1); dz <= rz + 1; dz++) {
-                double nx = dx / (double) rx;
-                double nz = dz / (double) rz;
-                double hDist2 = nx * nx + nz * nz;
-
-                // Only the outer 35–120 % of the horizontal radius (rim, not interior)
-                if (hDist2 < 0.42 || hDist2 > 1.28) continue;
-
-                long nh = hashPos(cx + dx, cy - 1, cz + dz);
-                float skirtNoise = (float) ((nh & 0xFFFFL) / (double) 0xFFFFL);
-
-                // 1-block drop — most of the rim gets this
-                BlockPos p1 = BlockPos.containing(center.x + dx, center.y - 1, center.z + dz);
-                if (rand.nextFloat() < 0.72f && level.getBlockState(p1).isAir()) {
-                    level.setBlock(p1, LEAVES, 3);
-                }
-
-                // 2-block drop — sparse, driven by noise so it's distributed unevenly
-                if (skirtNoise > 0.48f) {
-                    BlockPos p2 = BlockPos.containing(center.x + dx, center.y - 2, center.z + dz);
-                    if (rand.nextFloat() < 0.38f && level.getBlockState(p2).isAir()) {
-                        level.setBlock(p2, LEAVES, 3);
                     }
                 }
             }
