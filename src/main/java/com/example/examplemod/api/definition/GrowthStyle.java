@@ -10,5 +10,6 @@ public enum GrowthStyle {
     ANCIENT_OAK,
     BIRCH,
     REDWOOD,
-    SPRUCE
+    SPRUCE,
+    COMMON_OAK
 }
